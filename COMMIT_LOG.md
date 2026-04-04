@@ -1,8 +1,8 @@
 # Brim Expense Intelligence
 
 - Project name: Brim Expense Intelligence
-- Current status: The app now includes a deterministic pre-approval request flow with structured advisory recommendations, while the historical dashboard, compliance review, and grounded assistant architecture remain intact
-- Current active slice: Slice 4 - New expense pre-approval form and recommendation flow
+- Current status: The app now simulates employee and manager roles with a lightweight persistent request workflow, so submitted requests move through manager-visible status buckets without any auth or backend
+- Current active slice: Workflow simulation - employee submission and manager request queue
 - Next planned step: Start slice 5 by adding grouped expense report generation with risky items clearly marked
 
 ## 2026-04-02 21:22 - Establish product rules
@@ -82,3 +82,15 @@
 - Change: Added a new `/pre-approval` page with compact request form inputs, a deterministic pre-approval evaluation route, structured policy/workflow/risk checks, advisory recommendation states, grouped review packet UI, and explicit reviewer context that combines workbook-derived similar-spend signals with small mock directory and budget enrichment.
 - Reason: Deliver the new spend action layer as a fully demoable form-based slice without relying on any live AI calls or changing the existing dashboard/compliance architecture.
 - Notes: Employee, department, approver, and budget context are honest demo enrichment because the workbook has no HR or budget master data. Historical similar-spend notes still use the real workbook through simple deterministic matching.
+
+## 2026-04-03 22:46 - Add reviewer decision workflow to pre-approval
+- Slice: 4 follow-up
+- Change: Added a human decision panel after the pre-approval evaluation, allowing the reviewer to record a final approve / deny / review / investigate action with an optional note, timestamp, and clear distinction from the advisory system recommendation.
+- Reason: Complete the reviewer action step for the pre-approval slice without introducing persistence, backend workflow infrastructure, or any AI dependency.
+- Notes: Final reviewer decisions are stored only in lightweight client state for the current session, and can be changed for demo convenience.
+
+## 2026-04-03 23:18 - Add employee/manager workflow simulation with local request store
+- Slice: Workflow simulation
+- Change: Added a persistent employee/manager role toggle, moved submitted pre-approval requests into a lightweight localStorage-backed request store, and added a manager-facing requests board with status sections for new, review, investigate, approved, and denied requests. Managers can reopen stored requests, inspect the preserved evaluation packet, and update decisions without affecting historical workbook data.
+- Reason: Make the requester/approver workflow legible for demo purposes without introducing real authentication, backend persistence, or merging new requests into historical transactions.
+- Notes: Role selection and submitted requests are both persisted locally in the browser only. Employee mode hides manager-facing surfaces, while manager mode exposes dashboard and requests views separately.

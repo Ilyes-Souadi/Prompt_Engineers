@@ -4,8 +4,15 @@ import type {
 } from "@/types/transactions";
 
 export type RecommendationState = "approve" | "deny" | "review" | "investigate";
+export type ReviewerDecisionState = RecommendationState;
 export type CheckGroup = ComplianceClassification;
 export type CheckStatus = "pass" | "flag" | "needs_info";
+export type RequestWorkflowStatus =
+  | "new"
+  | "review"
+  | "investigate"
+  | "approved"
+  | "denied";
 
 export type ExpenseType =
   | "meal"
@@ -96,4 +103,21 @@ export type PreApprovalEvaluation = {
   rationale: string[];
   reviewerContext: ReviewerContext;
   requiredActions: string[];
+};
+
+export type ReviewerDecision = {
+  decision: ReviewerDecisionState;
+  reviewerNote?: string;
+  decidedAt: string;
+  requestId: string;
+};
+
+export type StoredExpenseRequest = {
+  id: string;
+  submittedAt: string;
+  updatedAt: string;
+  evaluation: PreApprovalEvaluation;
+  systemRecommendation: RecommendationState;
+  managerDecision?: ReviewerDecision;
+  status: RequestWorkflowStatus;
 };

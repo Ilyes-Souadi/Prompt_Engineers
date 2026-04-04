@@ -40,7 +40,10 @@ export function PreApprovalReviewPacket({ evaluation }: PreApprovalReviewPacketP
           <p className="section-kicker">Review packet</p>
           <h2>Advisory recommendation</h2>
         </div>
-        <RecommendationBadge recommendation={evaluation.recommendation} />
+        <div className="recommendation-header-block">
+          <span className="muted-line">System recommendation</span>
+          <RecommendationBadge recommendation={evaluation.recommendation} />
+        </div>
       </div>
 
       <div className="compliance-summary-grid">
@@ -222,7 +225,7 @@ export function PreApprovalReviewPacket({ evaluation }: PreApprovalReviewPacketP
       </div>
 
       <p className="pre-approval-advisory-note">
-        Recommendation is advisory. Final decision remains with the reviewer.
+        System recommendation is advisory. Final decision remains with the reviewer.
       </p>
     </section>
   );
