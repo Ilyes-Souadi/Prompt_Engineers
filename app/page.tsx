@@ -1,4 +1,5 @@
 import { AssistantPanel } from "@/components/assistant-panel";
+import { ComplianceReview } from "@/components/compliance-review";
 import { InsightList } from "@/components/insight-list";
 import { MetricCard } from "@/components/metric-card";
 import { RegionBreakdown } from "@/components/region-breakdown";
@@ -79,10 +80,20 @@ export default async function HomePage() {
             </section>
           </div>
 
+          <ComplianceReview
+            flags={dashboard.compliance.flags}
+            summary={dashboard.compliance.summary}
+          />
+
           <TransactionTable transactions={dashboard.transactions.slice(0, 100)} />
         </section>
 
-        <AssistantPanel />
+        <AssistantPanel
+          datasetName={dashboard.source.datasetName}
+          transactionCount={dashboard.summary.transactionCount}
+          riskAlertCount={dashboard.compliance.summary.classificationCounts.risk}
+          workflowItemCount={dashboard.compliance.summary.classificationCounts.workflow}
+        />
       </div>
     </main>
   );

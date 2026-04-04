@@ -1,3 +1,4 @@
+import { evaluateTransactions } from "@/lib/compliance/evaluate-transactions";
 import path from "node:path";
 import { loadWorkbookRows } from "@/lib/transactions/load-workbook";
 import {
@@ -24,6 +25,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   const spendingTransactions = transactions.filter((transaction) => transaction.amount > 0);
   const totalSpend = spendingTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
   const orderedDates = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+  const compliance = evaluateTransactions(transactions);
 
   return {
     source: {
@@ -42,6 +44,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       countryBreakdown: buildCountryBreakdown(transactions, totalSpend),
     },
     insights: buildInsights(transactions, totalSpend),
+    compliance,
     transactions,
   };
 }

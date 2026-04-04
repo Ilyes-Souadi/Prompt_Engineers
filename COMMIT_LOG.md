@@ -1,9 +1,9 @@
 # Brim Expense Intelligence
 
 - Project name: Brim Expense Intelligence
-- Current status: Slice 1 is implemented and demoable using the real provided workbook sample, deterministic insights, and a disabled assistant panel placeholder
-- Current active slice: Slice 1 - Load transaction data and show a summary dashboard
-- Next planned step: Start slice 2 by wiring Claude-powered chat over the loaded transaction data without adding policy logic yet
+- Current status: Grounded Claude chat now works over the loaded workbook and deterministic compliance data, while the compliance review UI remains risk-first and deterministic
+- Current active slice: Slice 2 - Grounded Claude chat over loaded transaction and compliance data
+- Next planned step: Start slice 4 by adding the new expense pre-approval form and deterministic approve / deny / review recommendation flow
 
 ## 2026-04-02 21:22 - Establish product rules
 - Slice: Foundation / Applies to all slices
@@ -40,3 +40,39 @@
 - Change: Copied the provided `.xlsx` sample into the repo, replaced the CSV-based loader with a workbook parser, updated normalization to use the real column names and Excel date format, removed the invented demo CSV, and refreshed the dashboard copy to reference the real sample. The ledger table now shows a recent subset while summaries still use the full dataset.
 - Reason: Align slice 1 with the actual transaction sample instead of invented data so future slices build on the correct source format and field structure.
 - Notes: The real sample currently yields 4,235 transactions and 4 deterministic insights. Added the `xlsx` dependency to keep the spreadsheet handling simple. One `npm audit` high-severity vulnerability was reported after installing `xlsx` and has not been addressed yet.
+
+## 2026-04-03 18:58 - Add deterministic policy compliance engine
+- Slice: 2
+- Change: Added policy constants sourced from the Brim expense policy PDF, a deterministic compliance evaluator, compliance summary data in the dashboard payload, and a review UI with severity counts, filters, and expandable rule explanations.
+- Reason: Deliver a demoable compliance review workflow without any AI, chat, or RAG while keeping every flag grounded in explicit code and the policy document.
+- Notes: Implemented rule types for over-$50 pre-authorization, possible split transactions, exact duplicates, near duplicates, fee or cash-advance style charges, and generic needs-review cases. On the current workbook sample the engine returns 4,420 total flags across 3,373 unique transactions.
+
+## 2026-04-03 19:22 - Refine slice 2 to separate risk from workflow noise
+- Slice: 2
+- Change: Added a `risk` / `workflow` / `info` classification layer to compliance flags, changed pre-authorization items to workflow-weighted severity, and updated the review UI to default to risk-first filtering with grouped summary counters and lighter treatment for non-risk items.
+- Reason: Reduce overflagging in the presentation layer so true risk stands out while still tracking process requirements and ambiguous items.
+- Notes: The current workbook sample now breaks down as 1,486 risk alerts, 2,736 workflow items, and 198 info items, with 448 high-severity flags after reweighting workflow alerts.
+
+## 2026-04-03 19:31 - Stabilize classification rendering bug
+- Slice: 2 bugfix
+- Change: Hardened the compliance review component and evaluator with fallback classification counts, default empty arrays, and a default `info` classification when missing so the UI no longer crashes on undefined class data.
+- Reason: Fix the runtime error caused by the frontend reading `.risk` before `classificationCounts` was guaranteed to exist.
+- Notes: `npm run lint` and `npm run build` both pass after the fix, and the API still returns populated classification counts for the current sample workbook.
+
+## 2026-04-03 19:42 - Fix compliance hydration mismatch
+- Slice: 2 bugfix
+- Change: Removed client-side fallback zero rendering for compliance summary counts and changed the review component to render only when real server props are present, while keeping server-side summary initialization intact.
+- Reason: Fix the hydration warning caused by the server rendering real totals like 4,420 while the client initially rendered fallback zeros.
+- Notes: The client now matches the server on first render for compliance totals and classification counts.
+
+## 2026-04-03 19:50 - Normalize compliance data contract to fix .risk crash
+- Slice: 2 bugfix
+- Change: Added a shared compliance defaults/normalization module, normalized `ComplianceSummary` and flagged items before rendering, and kept `ComplianceReview` reading from a single stable summary shape.
+- Reason: Fix the remaining runtime error caused by direct `.risk` access when `classificationCounts` was missing or shaped differently than the component expected.
+- Notes: Verified the live API now returns `classificationCounts` and per-flag `classification`, and the app loads with the compliance section visible without the `.risk` crash.
+
+## 2026-04-03 21:02 - Add grounded Claude finance copilot chat
+- Slice: 2
+- Change: Replaced the disabled assistant placeholder with a real chat panel, added a server-side assistant route that rebuilds the local dashboard and compliance data on each question, and added deterministic grounding context that summarizes workbook facts, policy rules, large transactions, common flag types, and keyword-matched transactions or flags before calling Claude.
+- Reason: Deliver the planned chat slice without moving policy logic into AI, so answers stay tied to the loaded workbook and the existing deterministic compliance engine.
+- Notes: The assistant uses the Anthropic Messages API with `ANTHROPIC_API_KEY` and optional `ANTHROPIC_MODEL`, defaulting to `claude-sonnet-4-6`. Per `PROJECT_RULES.md`, this chat work is treated as slice 2 even though earlier local compliance entries were logged as slice 2 before the rules file became the source of truth.
