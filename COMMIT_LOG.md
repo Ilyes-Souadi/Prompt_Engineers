@@ -2,8 +2,8 @@
 
 - Project name: Brim Expense Intelligence
 - Current status: The app now simulates employee and manager roles with a lightweight persistent request workflow, a manager-facing expense reports surface, and a live Claude assistant grounded in the workbook plus a repo-backed policy document
-- Current active slice: Improve grounded assistant retrieval over the full source documents
-- Next planned step: Refine additional query patterns only if needed, while keeping the assistant grounded in the workbook/policy documents and avoiding heavy RAG
+- Current active slice: Documentation and handoff polish
+- Next planned step: Refine additional assistant query patterns only if needed, while keeping the assistant grounded in the workbook/policy documents and avoiding heavy RAG
 
 ## 2026-04-02 21:22 - Establish product rules
 - Slice: Foundation / Applies to all slices
@@ -124,6 +124,12 @@
 - Change: Updated the assistant grounding path to carry forward the last explicit month/category scope from recent user turns, match expense report/category/month requests against the full workbook-backed dataset, apply deterministic amount filters like "above $1000", and pass the resulting scoped transaction list to Claude as primary evidence. Also widened the assistant route history window so the grounding builder can still see the earlier scope-setting turn during follow-up questions.
 - Reason: Let the assistant answer document-grounded follow-up questions correctly without dumping the full workbook into every prompt or introducing heavy retrieval infrastructure.
 - Notes: This keeps the server-side source documents as the real source of truth while giving Claude effective access to the exact transaction subset relevant to the user's question. Validation: `npm run lint` and `npm run build` both passed, and a live three-turn assistant conversation now correctly carries December software scope into the follow-up request for transactions above $1,000.
+
+## 2026-04-04 01:42 - Add root project README for summary and handoff
+- Slice: Documentation
+- Change: Added a detailed root `README.md` summarizing the product, implemented slices, routes, architecture, data sources, deterministic-vs-AI responsibilities, local setup, environment variables, and current constraints.
+- Reason: Make the repo easier to review, demo, and hand off without needing to reconstruct the product from multiple implementation files.
+- Notes: The README is intentionally high-level and product-oriented, while `PROJECT_RULES.md` remains the source of truth and `COMMIT_LOG.md` remains the chronological project memory.
 
 ## 2026-04-04 00:49 - Switch local assistant model to Claude Haiku 4.5
 - Slice: 2 local config
