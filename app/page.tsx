@@ -1,3 +1,4 @@
+import { AppNav } from "@/components/app-nav";
 import { AssistantPanel } from "@/components/assistant-panel";
 import { ComplianceReview } from "@/components/compliance-review";
 import { InsightList } from "@/components/insight-list";
@@ -13,6 +14,8 @@ export default async function HomePage() {
 
   return (
     <main className="page-shell">
+      <AppNav currentPath="/" />
+
       <section className="page-header">
         <div>
           <p className="eyebrow">Brim Expense Intelligence</p>

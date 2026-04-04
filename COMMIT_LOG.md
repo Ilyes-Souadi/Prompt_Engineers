@@ -1,9 +1,9 @@
 # Brim Expense Intelligence
 
 - Project name: Brim Expense Intelligence
-- Current status: Grounded Claude chat now works over the loaded workbook and deterministic compliance data, while the compliance review UI remains risk-first and deterministic
-- Current active slice: Slice 2 - Grounded Claude chat over loaded transaction and compliance data
-- Next planned step: Start slice 4 by adding the new expense pre-approval form and deterministic approve / deny / review recommendation flow
+- Current status: The app now includes a deterministic pre-approval request flow with structured advisory recommendations, while the historical dashboard, compliance review, and grounded assistant architecture remain intact
+- Current active slice: Slice 4 - New expense pre-approval form and recommendation flow
+- Next planned step: Start slice 5 by adding grouped expense report generation with risky items clearly marked
 
 ## 2026-04-02 21:22 - Establish product rules
 - Slice: Foundation / Applies to all slices
@@ -76,3 +76,9 @@
 - Change: Replaced the disabled assistant placeholder with a real chat panel, added a server-side assistant route that rebuilds the local dashboard and compliance data on each question, and added deterministic grounding context that summarizes workbook facts, policy rules, large transactions, common flag types, and keyword-matched transactions or flags before calling Claude.
 - Reason: Deliver the planned chat slice without moving policy logic into AI, so answers stay tied to the loaded workbook and the existing deterministic compliance engine.
 - Notes: The assistant uses the Anthropic Messages API with `ANTHROPIC_API_KEY` and optional `ANTHROPIC_MODEL`, defaulting to `claude-sonnet-4-6`. Per `PROJECT_RULES.md`, this chat work is treated as slice 2 even though earlier local compliance entries were logged as slice 2 before the rules file became the source of truth.
+
+## 2026-04-03 22:18 - Add deterministic pre-approval request flow
+- Slice: 4
+- Change: Added a new `/pre-approval` page with compact request form inputs, a deterministic pre-approval evaluation route, structured policy/workflow/risk checks, advisory recommendation states, grouped review packet UI, and explicit reviewer context that combines workbook-derived similar-spend signals with small mock directory and budget enrichment.
+- Reason: Deliver the new spend action layer as a fully demoable form-based slice without relying on any live AI calls or changing the existing dashboard/compliance architecture.
+- Notes: Employee, department, approver, and budget context are honest demo enrichment because the workbook has no HR or budget master data. Historical similar-spend notes still use the real workbook through simple deterministic matching.
