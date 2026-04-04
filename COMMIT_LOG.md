@@ -1,9 +1,9 @@
 # Brim Expense Intelligence
 
 - Project name: Brim Expense Intelligence
-- Current status: The app now simulates employee and manager roles with a lightweight persistent request workflow, so submitted requests move through manager-visible status buckets without any auth or backend
-- Current active slice: Workflow simulation - employee submission and manager request queue
-- Next planned step: Start slice 5 by adding grouped expense report generation with risky items clearly marked
+- Current status: The app now simulates employee and manager roles with a lightweight persistent request workflow and a manager-facing expense reports surface built from historical workbook transactions
+- Current active slice: Expense report generation from workbook-backed historical transactions
+- Next planned step: Add lightweight manager-side follow-up actions around reports only if needed, while keeping exports and heavy workflow infrastructure out of scope
 
 ## 2026-04-02 21:22 - Establish product rules
 - Slice: Foundation / Applies to all slices
@@ -94,3 +94,9 @@
 - Change: Added a persistent employee/manager role toggle, moved submitted pre-approval requests into a lightweight localStorage-backed request store, and added a manager-facing requests board with status sections for new, review, investigate, approved, and denied requests. Managers can reopen stored requests, inspect the preserved evaluation packet, and update decisions without affecting historical workbook data.
 - Reason: Make the requester/approver workflow legible for demo purposes without introducing real authentication, backend persistence, or merging new requests into historical transactions.
 - Notes: Role selection and submitted requests are both persisted locally in the browser only. Employee mode hides manager-facing surfaces, while manager mode exposes dashboard and requests views separately.
+
+## 2026-04-03 23:56 - Add manager-facing historical expense reports
+- Slice: 5
+- Change: Added a manager-only Expense Reports route and tab, a deterministic report builder over workbook-backed historical transactions, and a master-detail reports view with grouped report cards, report detail, report findings, and readiness states.
+- Reason: Turn raw historical transactions into reviewable expense report objects that represent business events or spend clusters instead of forcing managers to inspect single transactions one by one.
+- Notes: Report grouping uses deterministic date proximity plus merchant/category keyword heuristics for trip, transport, meals, software, and general spend. Report findings reuse historical compliance flags where possible and derive a report status of `ready`, `review`, or `investigate`. Validation: `npm run lint` and `npm run build` both passed.

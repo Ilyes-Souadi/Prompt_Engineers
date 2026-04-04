@@ -5,10 +5,12 @@ import { AppNav } from "@/components/app-nav";
 import { AssistantPanel } from "@/components/assistant-panel";
 import { ComplianceReview } from "@/components/compliance-review";
 import { InsightList } from "@/components/insight-list";
+import { ExpenseReportsBoard } from "@/components/manager/expense-reports-board";
 import { RequestsBoard } from "@/components/manager/requests-board";
 import { MetricCard } from "@/components/metric-card";
 import { ExpenseRequestForm } from "@/components/pre-approval/expense-request-form";
 import { PreApprovalReviewPacket } from "@/components/pre-approval/pre-approval-review-packet";
+import { buildExpenseReports } from "@/lib/expense-reports/build-expense-reports";
 import { RegionBreakdown } from "@/components/region-breakdown";
 import { RoleToggle } from "@/components/role-toggle";
 import { TopMerchantsTable } from "@/components/top-merchants-table";
@@ -33,7 +35,7 @@ import type {
 
 type AppWorkspaceProps = {
   dashboard: DashboardData;
-  initialManagerView: "dashboard" | "requests";
+  initialManagerView: "dashboard" | "requests" | "reports";
 };
 
 export function AppWorkspace({
@@ -47,7 +49,14 @@ export function AppWorkspace({
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [managerView, setManagerView] = useState<"dashboard" | "requests">(initialManagerView);
+  const [managerView, setManagerView] = useState<"dashboard" | "requests" | "reports">(
+    initialManagerView,
+  );
+
+  const expenseReports = useMemo(
+    () => buildExpenseReports(dashboard.transactions, dashboard.compliance.flags),
+    [dashboard.compliance.flags, dashboard.transactions],
+  );
 
   useEffect(() => {
     setRole(loadStoredRole());
@@ -67,12 +76,19 @@ export function AppWorkspace({
   }, [initialManagerView]);
 
   const requestCount = requests.length;
+  const reportCount = expenseReports.length;
   const managerHeadline =
-    managerView === "dashboard" ? "Historical expense overview" : "Submitted expense requests";
+    managerView === "dashboard"
+      ? "Historical expense overview"
+      : managerView === "requests"
+        ? "Submitted expense requests"
+        : "Generated expense reports";
   const managerCopy =
     managerView === "dashboard"
       ? "The provided transaction sample is loaded from the real spreadsheet format. All flagged insights in this slice come from deterministic rules, not AI."
-      : "Submitted pre-approval requests stay separate from historical workbook transactions. Managers can inspect the system recommendation, then record the final status.";
+      : managerView === "requests"
+        ? "Submitted pre-approval requests stay separate from historical workbook transactions. Managers can inspect the system recommendation, then record the final status."
+        : "Expense reports are generated deterministically from historical workbook transactions. Grouping, findings, and readiness states are structured for manager review rather than auto-decisioning.";
 
   async function handleEmployeeSubmit() {
     setIsSubmitting(true);
@@ -119,7 +135,16 @@ export function AppWorkspace({
   return (
     <main className="page-shell">
       <div className="app-topbar">
-        <AppNav currentPath={managerView === "dashboard" ? "/" : "/pre-approval"} />
+        <AppNav
+          currentPath={
+            managerView === "dashboard"
+              ? "/"
+              : managerView === "reports"
+                ? "/expense-reports"
+                : "/pre-approval"
+          }
+          role={role}
+        />
         <RoleToggle
           role={role}
           onChange={(nextRole) => {
@@ -150,6 +175,8 @@ export function AppWorkspace({
             {role === "manager"
               ? managerView === "dashboard"
                 ? `${dashboard.summary.transactionCount} transactions loaded`
+                : managerView === "reports"
+                  ? `${reportCount} generated reports from historical transactions`
                 : `${requestCount} submitted requests in local workflow store`
               : `${requestCount} submitted requests currently stored for manager review`}
           </span>
@@ -173,6 +200,14 @@ export function AppWorkspace({
             >
               Requests
               <span className="classification-count">{requestCount}</span>
+            </button>
+            <button
+              type="button"
+              className={`classification-tab ${managerView === "reports" ? "is-active" : ""}`}
+              onClick={() => setManagerView("reports")}
+            >
+              Expense Reports
+              <span className="classification-count">{reportCount}</span>
             </button>
           </div>
 
@@ -243,8 +278,10 @@ export function AppWorkspace({
                 workflowItemCount={dashboard.compliance.summary.classificationCounts.workflow}
               />
             </div>
-          ) : (
+          ) : managerView === "requests" ? (
             <RequestsBoard requests={requests} onUpdateRequest={handleUpdateStoredRequest} />
+          ) : (
+            <ExpenseReportsBoard reports={expenseReports} />
           )}
         </>
       ) : (
