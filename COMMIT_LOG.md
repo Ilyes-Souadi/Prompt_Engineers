@@ -2,8 +2,8 @@
 
 - Project name: Brim Expense Intelligence
 - Current status: The app now simulates employee and manager roles with a lightweight persistent request workflow, a manager-facing expense reports surface, and a live Claude assistant grounded in the workbook plus a repo-backed policy document
-- Current active slice: Live source-document-grounded assistant
-- Next planned step: Broaden grounded assistant coverage to newer deterministic slices only if needed, while keeping AI explanation-only and avoiding heavy RAG
+- Current active slice: Improve grounded assistant retrieval over the full source documents
+- Next planned step: Refine additional query patterns only if needed, while keeping the assistant grounded in the workbook/policy documents and avoiding heavy RAG
 
 ## 2026-04-02 21:22 - Establish product rules
 - Slice: Foundation / Applies to all slices
@@ -112,6 +112,18 @@
 - Change: Added the Brim policy PDF into `data/policy/`, generated a text companion from that source document for stable server-side runtime grounding, configured the local Anthropic environment, and smoke-tested `/api/assistant` successfully with a live Claude response.
 - Reason: Complete the source-document-grounded assistant path end to end on the local machine without introducing heavy retrieval infrastructure or weakening provenance rules.
 - Notes: The assistant now answers from the workbook plus the repo-backed policy document and deterministic outputs derived from them. The local `.env.local` remains untracked and should not be committed.
+
+## 2026-04-04 01:03 - Make grounded assistant responses more conversational
+- Slice: 2 UX refinement
+- Change: Rewrote the assistant system prompt to favor direct chat-style answers, reduced the always-on grounding payload to a smaller baseline, made detailed policy/report/risk context conditional on the user question, reduced message-history carryover, and added a tiny plain-text cleanup step for raw markdown heading/bold artifacts in the assistant UI.
+- Reason: Improve the live assistant's conversational quality without weakening the strict workbook/policy grounding rules or moving any deterministic logic into AI.
+- Notes: The assistant should now answer more directly, default to shorter responses, and avoid mini-report formatting unless the user explicitly asks for more detail. Validation: `npm run lint` and `npm run build` both passed, and live prompt checks showed shorter plain-text responses without markdown headings.
+
+## 2026-04-04 01:19 - Add deterministic scoped retrieval for assistant follow-up questions
+- Slice: 2 retrieval refinement
+- Change: Updated the assistant grounding path to carry forward the last explicit month/category scope from recent user turns, match expense report/category/month requests against the full workbook-backed dataset, apply deterministic amount filters like "above $1000", and pass the resulting scoped transaction list to Claude as primary evidence. Also widened the assistant route history window so the grounding builder can still see the earlier scope-setting turn during follow-up questions.
+- Reason: Let the assistant answer document-grounded follow-up questions correctly without dumping the full workbook into every prompt or introducing heavy retrieval infrastructure.
+- Notes: This keeps the server-side source documents as the real source of truth while giving Claude effective access to the exact transaction subset relevant to the user's question. Validation: `npm run lint` and `npm run build` both passed, and a live three-turn assistant conversation now correctly carries December software scope into the follow-up request for transactions above $1,000.
 
 ## 2026-04-04 00:49 - Switch local assistant model to Claude Haiku 4.5
 - Slice: 2 local config

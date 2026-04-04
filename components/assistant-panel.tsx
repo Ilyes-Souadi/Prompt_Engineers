@@ -67,7 +67,7 @@ export function AssistantPanel({
 
       setMessages((currentMessages) => [
         ...currentMessages,
-        createPanelMessage("assistant", payload.reply),
+        createPanelMessage("assistant", normalizeAssistantReply(payload.reply)),
       ]);
     } catch (submitError) {
       setError(
@@ -95,8 +95,8 @@ export function AssistantPanel({
           {formatCount(transactionCount)} transactions are ready for questions.
         </strong>
         <p className="assistant-message">
-          Answers stay grounded in the loaded workbook, the deterministic compliance
-          engine, and the explicit Brim policy rules already in code.
+          Answers stay grounded in the workbook, the repo-backed policy document, and
+          deterministic outputs derived from them.
         </p>
       </div>
 
@@ -198,4 +198,13 @@ function createPanelMessage(role: PanelMessage["role"], content: string): PanelM
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("en-CA").format(value);
+}
+
+function normalizeAssistantReply(value: string) {
+  return value
+    .replace(/\r/g, "")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }

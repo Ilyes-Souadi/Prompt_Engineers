@@ -12,7 +12,7 @@ import type {
 } from "@/types/assistant";
 
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
-const MAX_HISTORY_MESSAGES = 6;
+const MAX_HISTORY_MESSAGES = 8;
 const MAX_MESSAGE_LENGTH = 2_000;
 
 type AnthropicResponse = {
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const systemPrompt = buildAssistantSystemPrompt(latestMessage.content, dashboard, policyDocument);
+  const systemPrompt = buildAssistantSystemPrompt(messages, dashboard, policyDocument);
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

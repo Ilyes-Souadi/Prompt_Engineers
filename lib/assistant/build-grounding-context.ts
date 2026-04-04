@@ -1,5 +1,6 @@
 import { buildExpenseReports } from "@/lib/expense-reports/build-expense-reports";
 import { formatCurrency, formatPercent } from "@/lib/transactions/format";
+import type { AssistantConversationMessage } from "@/types/assistant";
 import type { ExpenseReport } from "@/types/expense-report";
 import type { PolicyDocument } from "@/lib/policy/load-policy-document";
 import type {
@@ -42,21 +43,54 @@ const STOP_WORDS = new Set([
 
 const MAX_RELEVANT_TRANSACTIONS = 8;
 const MAX_RELEVANT_FLAGS = 8;
-const MAX_LARGEST_TRANSACTIONS = 5;
-const MAX_FLAG_HIGHLIGHTS = 5;
-const MAX_POLICY_CHUNKS = 6;
-const MAX_RELEVANT_REPORTS = 5;
+const MAX_LARGEST_TRANSACTIONS = 3;
+const MAX_FLAG_HIGHLIGHTS = 4;
+const MAX_POLICY_CHUNKS = 4;
+const MAX_RELEVANT_REPORTS = 3;
+const MAX_SCOPED_TRANSACTIONS = 40;
+const MONTH_NAMES = [
+  "january",
+  "february",
+  "march",
+  "april",
+  "may",
+  "june",
+  "july",
+  "august",
+  "september",
+  "october",
+  "november",
+  "december",
+] as const;
+const REPORT_TYPE_KEYWORDS: Record<ExpenseReport["type"], string[]> = {
+  trip: ["trip", "travel", "flight", "hotel", "lodging"],
+  client_entertainment: ["client entertainment", "entertainment", "client meal"],
+  meals: ["meal", "meals", "restaurant", "food", "dining"],
+  local_transport: ["transport", "uber", "lyft", "taxi", "parking", "toll", "fuel"],
+  software: ["software", "subscription", "subscriptions", "saas", "license", "licenses"],
+  general: ["general", "business spend"],
+};
 
 export function buildAssistantSystemPrompt(
-  question: string,
+  messages: AssistantConversationMessage[],
   dashboard: DashboardData,
   policyDocument: PolicyDocument,
 ): string {
+  const latestQuestion =
+    [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
+  const conversationQuestion = buildConversationQuestion(messages);
+  const question = latestQuestion || conversationQuestion;
+  const questionLower = question.toLowerCase();
+  const keywords = extractKeywords(question);
   const expenseReports = buildExpenseReports(dashboard.transactions, dashboard.compliance.flags);
-  const relevantTransactions = findRelevantTransactions(question, dashboard.transactions);
+  const scopedContext = resolveScopedTransactionContext(messages, dashboard.transactions, expenseReports);
+  const shouldPreferScopedTransactions = scopedContext.transactions.length > 0;
+  const relevantTransactions = shouldPreferScopedTransactions
+    ? []
+    : findRelevantTransactions(question, dashboard.transactions);
   const relevantFlags = findRelevantFlags(question, dashboard.compliance.flags);
-  const relevantPolicyChunks = findRelevantPolicyChunks(question, policyDocument);
-  const relevantReports = findRelevantReports(question, expenseReports);
+  const relevantPolicyChunks = findRelevantPolicyChunks(question, keywords, policyDocument);
+  const relevantReports = findRelevantReports(question, keywords, expenseReports);
   const largestTransactions = [...dashboard.transactions]
     .filter((transaction) => transaction.amount > 0)
     .sort((a, b) => b.amount - a.amount || b.date.localeCompare(a.date))
@@ -65,99 +99,221 @@ export function buildAssistantSystemPrompt(
     .filter((flag) => flag.classification === "risk")
     .slice(0, MAX_FLAG_HIGHLIGHTS);
   const topFlagTypes = dashboard.compliance.summary.flagTypeCounts.slice(0, 5);
-  const countryMix = dashboard.summary.countryBreakdown.slice(0, 5);
   const topMerchants = dashboard.summary.topMerchants.slice(0, 5);
   const reportStatusCounts = summarizeReportStatuses(expenseReports);
   const topReportTypes = summarizeReportTypes(expenseReports);
+  const recentUserMessages = messages.filter((message) => message.role === "user");
+  const shouldIncludePolicyContext = isPolicyQuestion(questionLower, keywords);
+  const shouldIncludeMerchantContext =
+    !shouldPreferScopedTransactions && isMerchantOrSpendQuestion(questionLower, keywords);
+  const shouldIncludeRiskContext = isRiskQuestion(questionLower, keywords);
+  const shouldIncludeInsightContext =
+    !shouldPreferScopedTransactions && isOverviewQuestion(questionLower, keywords);
+  const shouldIncludeReportContext =
+    !shouldPreferScopedTransactions && isReportQuestion(questionLower, keywords);
 
-  return [
-    "You are the Brim Expense Intelligence finance copilot.",
-    "Answer only with facts grounded in source documents that exist in this project.",
-    "Approved source documents for this answer are the workbook transaction file and the Brim policy document loaded below.",
-    "You may use deterministic dashboard, compliance, and expense-report outputs only when they are derived from those source documents.",
-    "Do not invent transactions, policy rules, approvals, receipts, employees, reimbursements, or workflow history that is not present in the grounded context.",
-    "Treat deterministic engine outputs as source-of-truth interpretations derived from the workbook and policy documents, not as model opinions.",
-    "If the available context does not support a confident answer, say that clearly.",
-    "Separate facts from interpretation with phrasing like 'The loaded data shows...' or 'This may suggest...'.",
-    "Keep the answer concise and demo-friendly.",
-    "",
-    "Grounding provenance:",
-    `- Workbook source: ${dashboard.source.datasetName}`,
-    `- Policy source: ${policyDocument.sourcePath}`,
-    `- Policy source type: ${policyDocument.sourceType}`,
-    "",
-    "Workbook snapshot:",
-    `- Dataset: ${dashboard.source.datasetName}`,
-    `- Transactions loaded: ${dashboard.summary.transactionCount}`,
-    `- Total spend: ${formatCurrency(dashboard.summary.totalSpend)}`,
-    `- Date range: ${dashboard.summary.startDate} to ${dashboard.summary.endDate}`,
-    `- Countries covered: ${dashboard.summary.countryCount}`,
-    "",
-    "Top merchants by spend:",
-    ...topMerchants.map(
-      (merchant) =>
-        `- ${merchant.merchant}: ${formatCurrency(merchant.totalSpend)} (${formatPercent(
-          merchant.shareOfSpend,
-        )} of spend)`,
-    ),
-    "",
-    "Country mix:",
-    ...countryMix.map(
-      (country) =>
-        `- ${country.country}: ${formatCurrency(country.totalSpend)} (${formatPercent(
-          country.shareOfSpend,
-        )} of spend)`,
-    ),
-    "",
-    "Current dashboard insights:",
-    ...dashboard.insights.map((insight) => `- ${insight.title} ${insight.detail}`),
-    "",
-    "Compliance snapshot:",
-    `- Total flags: ${dashboard.compliance.summary.totalFlags}`,
-    `- Flagged transactions: ${dashboard.compliance.summary.flaggedTransactionCount}`,
-    `- Risk alerts: ${dashboard.compliance.summary.classificationCounts.risk}`,
-    `- Workflow items: ${dashboard.compliance.summary.classificationCounts.workflow}`,
-    `- Info items: ${dashboard.compliance.summary.classificationCounts.info}`,
-    `- High severity flags: ${dashboard.compliance.summary.severityCounts.high}`,
-    "",
-    "Expense report snapshot:",
-    `- Generated reports: ${expenseReports.length}`,
-    `- Ready reports: ${reportStatusCounts.ready}`,
-    `- Review reports: ${reportStatusCounts.review}`,
-    `- Investigate reports: ${reportStatusCounts.investigate}`,
-    ...topReportTypes.map((entry) => `- ${formatReportType(entry.type)}: ${entry.count}`),
-    "",
-    relevantPolicyChunks.length > 0
-      ? "Relevant policy excerpts from the source document:"
-      : "Relevant policy excerpts from the source document: none matched directly",
-    ...relevantPolicyChunks.map((chunk) => `- ${chunk.text}`),
-    "",
-    "Most common flag types:",
-    ...topFlagTypes.map(
-      (flagType) => `- ${formatFlagType(flagType.flagType)}: ${flagType.count}`,
-    ),
-    "",
-    "Largest spend transactions:",
-    ...largestTransactions.map(summarizeTransaction),
-    "",
-    "Representative risk alerts:",
-    ...highlightedRiskFlags.map(summarizeFlag),
-    "",
-    relevantTransactions.length > 0
-      ? "Relevant transactions for the latest user question:"
-      : "Relevant transactions for the latest user question: none matched directly",
-    ...relevantTransactions.map(summarizeTransaction),
-    "",
-    relevantFlags.length > 0
-      ? "Relevant compliance flags for the latest user question:"
-      : "Relevant compliance flags for the latest user question: none matched directly",
-    ...relevantFlags.map(summarizeFlag),
-    "",
-    relevantReports.length > 0
-      ? "Relevant expense reports derived from workbook transactions:"
-      : "Relevant expense reports derived from workbook transactions: none matched directly",
-    ...relevantReports.map(summarizeReport),
-  ].join("\n");
+  const promptSections = [
+    [
+      "You are the Brim Expense Intelligence finance copilot.",
+      "Answer like a helpful chat assistant, not a report writer.",
+      "Start with the direct answer in the first sentence.",
+      "Keep replies concise by default.",
+      "Use plain text only.",
+      "Do not use markdown headings, tables, bold markers, or decorative formatting.",
+      "Only use short hyphen bullets when a list genuinely makes the answer clearer.",
+      "Give more detail only if the user asks for it.",
+      "Do not repeat safety or provenance reminders unless they matter to the answer.",
+      "Answer only from the workbook, the repo-backed policy document, and deterministic outputs derived from them.",
+      "Do not invent transactions, policy rules, approvals, receipts, employees, reimbursements, or workflow history.",
+      "Treat deterministic engine outputs as source-of-truth interpretations of the source documents.",
+      "When the server provides a scoped transaction list for the user's request, use that list as the primary evidence for the answer.",
+      "When scoped transactions are present, keep counts, totals, lists, and thresholds strictly limited to that scoped set unless the user explicitly broadens the question.",
+      "If the grounded context is not enough, say so briefly.",
+    ].join("\n"),
+    [
+      "Core context:",
+      `- Dataset: ${dashboard.source.datasetName}`,
+      `- Transactions: ${dashboard.summary.transactionCount}`,
+      `- Date range: ${dashboard.summary.startDate} to ${dashboard.summary.endDate}`,
+      `- Risk alerts: ${dashboard.compliance.summary.classificationCounts.risk}`,
+      `- Workflow items: ${dashboard.compliance.summary.classificationCounts.workflow}`,
+      `- Info items: ${dashboard.compliance.summary.classificationCounts.info}`,
+      `- High severity flags: ${dashboard.compliance.summary.severityCounts.high}`,
+      `- Policy source: ${policyDocument.sourcePath}`,
+    ].join("\n"),
+  ];
+
+  if (recentUserMessages.length > 0) {
+    promptSections.push(
+      [
+        "Recent user questions:",
+        ...recentUserMessages.map((message) => `- ${message.content}`),
+      ].join("\n"),
+    );
+  }
+
+  if (shouldPreferScopedTransactions) {
+    promptSections.push(
+      [
+        "Resolved transaction scope for the current request:",
+        `- Scope label: ${scopedContext.label}`,
+        `- Matching transactions: ${scopedContext.totalMatches}`,
+        `- Scope total: ${formatCurrency(scopedContext.totalAmount)}`,
+        ...(scopedContext.thresholdAmount !== null
+          ? [`- Applied amount threshold: ${scopedContext.thresholdDirection} ${formatCurrency(scopedContext.thresholdAmount)}`]
+          : []),
+      ].join("\n"),
+    );
+
+    promptSections.push(
+      [
+        "Scoped transactions:",
+        ...scopedContext.transactions.map(summarizeTransaction),
+      ].join("\n"),
+    );
+  }
+
+  if (shouldIncludeMerchantContext) {
+    promptSections.push(
+      [
+        "Merchant and spend context:",
+        ...topMerchants.map(
+          (merchant) =>
+            `- ${merchant.merchant}: ${formatCurrency(merchant.totalSpend)} (${formatPercent(
+              merchant.shareOfSpend,
+            )} of spend)`,
+        ),
+      ].join("\n"),
+    );
+  }
+
+  if (shouldIncludeInsightContext) {
+    promptSections.push(
+      [
+        "Relevant dashboard insights:",
+        ...dashboard.insights.map((insight) => `- ${insight.title} ${insight.detail}`),
+      ].join("\n"),
+    );
+  }
+
+  if (shouldIncludeRiskContext) {
+    promptSections.push(
+      [
+        "Risk and compliance context:",
+        `- Total flags: ${dashboard.compliance.summary.totalFlags}`,
+        `- Flagged transactions: ${dashboard.compliance.summary.flaggedTransactionCount}`,
+        ...topFlagTypes.map(
+          (flagType) => `- ${formatFlagType(flagType.flagType)}: ${flagType.count}`,
+        ),
+      ].join("\n"),
+    );
+
+    if (highlightedRiskFlags.length > 0) {
+      promptSections.push(
+        [
+          "Representative risk alerts:",
+          ...highlightedRiskFlags.map(summarizeFlag),
+        ].join("\n"),
+      );
+    }
+
+    if (largestTransactions.length > 0) {
+      promptSections.push(
+        [
+          "Largest transactions:",
+          ...largestTransactions.map(summarizeTransaction),
+        ].join("\n"),
+      );
+    }
+  }
+
+  if (shouldIncludePolicyContext) {
+    promptSections.push(
+      [
+        relevantPolicyChunks.length > 0
+          ? "Relevant policy excerpts:"
+          : "Relevant policy excerpts: no direct keyword match found",
+        ...relevantPolicyChunks.map((chunk) => `- ${chunk.text}`),
+      ].join("\n"),
+    );
+  }
+
+  if (relevantTransactions.length > 0) {
+    promptSections.push(
+      [
+        "Question-matched transactions:",
+        ...(shouldPreferScopedTransactions
+          ? relevantTransactions
+              .filter(
+                (transaction) =>
+                  !scopedContext.transactions.some((scoped) => scoped.id === transaction.id),
+              )
+              .map(summarizeTransaction)
+          : relevantTransactions.map(summarizeTransaction)),
+      ].join("\n"),
+    );
+  }
+
+  if (relevantFlags.length > 0) {
+    promptSections.push(
+      [
+        "Question-matched compliance flags:",
+        ...relevantFlags.map(summarizeFlag),
+      ].join("\n"),
+    );
+  }
+
+  if (shouldIncludeReportContext) {
+    promptSections.push(
+      [
+        "Expense report context:",
+        `- Generated reports: ${expenseReports.length}`,
+        `- Ready: ${reportStatusCounts.ready}`,
+        `- Review: ${reportStatusCounts.review}`,
+        `- Investigate: ${reportStatusCounts.investigate}`,
+        ...topReportTypes.map((entry) => `- ${formatReportType(entry.type)}: ${entry.count}`),
+      ].join("\n"),
+    );
+
+    if (relevantReports.length > 0) {
+      promptSections.push(
+        [
+          "Question-matched expense reports:",
+          ...relevantReports.map(summarizeReport),
+        ].join("\n"),
+      );
+    }
+  }
+
+  return promptSections.join("\n\n");
+}
+
+type ScopedTransactionContext = {
+  label: string;
+  transactions: NormalizedTransaction[];
+  totalMatches: number;
+  totalAmount: number;
+  thresholdAmount: number | null;
+  thresholdDirection: "above" | "below" | null;
+};
+
+type AmountFilter = {
+  direction: "above" | "below";
+  amount: number;
+};
+
+type ConversationScope = {
+  monthYear: string | null;
+  reportType: ExpenseReport["type"] | null;
+  amountFilter: AmountFilter | null;
+};
+
+function buildConversationQuestion(messages: AssistantConversationMessage[]) {
+  return messages
+    .filter((message) => message.role === "user")
+    .map((message) => message.content.trim())
+    .filter(Boolean)
+    .join(" ");
 }
 
 function findRelevantTransactions(
@@ -302,23 +458,69 @@ function summarizeFlag(flag: ComplianceFlag) {
   )} | ${capitalize(flag.severity)} | ${formatFlagType(flag.flagType)} | ${flag.explanation}`;
 }
 
-function findRelevantPolicyChunks(question: string, policyDocument: PolicyDocument) {
-  const keywords = extractKeywords(question);
-  const weightedChunks =
-    keywords.length === 0
-      ? policyDocument.chunks.map((chunk) => ({ chunk, score: 1 }))
-      : policyDocument.chunks.map((chunk) => ({
-          chunk,
-          score: keywords.reduce((score, keyword) => {
-            const lowerChunk = chunk.text.toLowerCase();
+function resolveScopedTransactionContext(
+  messages: AssistantConversationMessage[],
+  transactions: NormalizedTransaction[],
+  reports: ExpenseReport[],
+): ScopedTransactionContext {
+  const latestUserMessage =
+    [...messages].reverse().find((message) => message.role === "user")?.content.toLowerCase() ?? "";
+  const conversationScope = resolveConversationScope(messages);
+  const amountFilter = conversationScope.amountFilter;
+  const matchedReport = findReportForScope(conversationScope, reports);
+  let scopedTransactions: NormalizedTransaction[] = [];
+  let label = "No resolved scope";
 
-            if (lowerChunk.includes(keyword)) {
-              return score + 3;
-            }
+  if (matchedReport) {
+    scopedTransactions = matchedReport.transactions;
+    label = matchedReport.title;
+  }
 
-            return score;
-          }, 0),
-        }));
+  if (scopedTransactions.length === 0) {
+    const categoryScoped = findTransactionsByScope(conversationScope, transactions);
+    if (categoryScoped.length > 0) {
+      scopedTransactions = categoryScoped;
+      label = describeConversationScope(conversationScope);
+    }
+  }
+
+  const filteredTransactions = applyAmountFilter(scopedTransactions, amountFilter).slice(
+    0,
+    MAX_SCOPED_TRANSACTIONS,
+  );
+  const totalMatches = applyAmountFilter(scopedTransactions, amountFilter).length;
+  const totalAmount = applyAmountFilter(scopedTransactions, amountFilter).reduce(
+    (sum, transaction) => sum + transaction.amount,
+    0,
+  );
+
+  return {
+    label,
+    transactions: filteredTransactions,
+    totalMatches,
+    totalAmount,
+    thresholdAmount: amountFilter?.amount ?? null,
+    thresholdDirection: amountFilter?.direction ?? null,
+  };
+}
+
+function findRelevantPolicyChunks(
+  question: string,
+  keywords: string[],
+  policyDocument: PolicyDocument,
+) {
+  const weightedChunks = policyDocument.chunks.map((chunk) => ({
+    chunk,
+    score: keywords.reduce((score, keyword) => {
+      const lowerChunk = chunk.text.toLowerCase();
+
+      if (lowerChunk.includes(keyword)) {
+        return score + 3;
+      }
+
+      return score;
+    }, 0),
+  }));
 
   return weightedChunks
     .filter((item) => item.score > 0)
@@ -327,13 +529,7 @@ function findRelevantPolicyChunks(question: string, policyDocument: PolicyDocume
     .map((item) => item.chunk);
 }
 
-function findRelevantReports(question: string, reports: ExpenseReport[]) {
-  const keywords = extractKeywords(question);
-
-  if (keywords.length === 0) {
-    return reports.slice(0, Math.min(reports.length, MAX_RELEVANT_REPORTS));
-  }
-
+function findRelevantReports(question: string, keywords: string[], reports: ExpenseReport[]) {
   return reports
     .map((report) => ({
       report,
@@ -423,6 +619,396 @@ function formatClassification(value: ComplianceFlag["classification"]) {
 
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function isRiskQuestion(questionLower: string, keywords: string[]) {
+  return hasAnyKeyword(questionLower, keywords, [
+    "risk",
+    "flag",
+    "flags",
+    "compliance",
+    "duplicate",
+    "split",
+    "cash",
+    "advance",
+    "alert",
+    "alerts",
+    "workflow",
+    "review",
+    "investigate",
+    "high",
+    "largest",
+    "biggest",
+  ]);
+}
+
+function isPolicyQuestion(questionLower: string, keywords: string[]) {
+  return hasAnyKeyword(questionLower, keywords, [
+    "policy",
+    "receipt",
+    "receipts",
+    "reimburse",
+    "reimbursed",
+    "reimbursement",
+    "pre",
+    "authorization",
+    "approve",
+    "approval",
+    "alcohol",
+    "tip",
+    "fee",
+    "fees",
+    "card",
+    "abuse",
+    "falsifying",
+  ]);
+}
+
+function isMerchantOrSpendQuestion(questionLower: string, keywords: string[]) {
+  return hasAnyKeyword(questionLower, keywords, [
+    "merchant",
+    "merchants",
+    "vendor",
+    "vendors",
+    "spend",
+    "amount",
+    "amounts",
+    "largest",
+    "top",
+    "who",
+    "where",
+    "cost",
+    "costs",
+  ]);
+}
+
+function isOverviewQuestion(questionLower: string, keywords: string[]) {
+  return hasAnyKeyword(questionLower, keywords, [
+    "summary",
+    "summarize",
+    "overview",
+    "pattern",
+    "patterns",
+    "trend",
+    "trends",
+    "happening",
+    "overall",
+  ]);
+}
+
+function isReportQuestion(questionLower: string, keywords: string[]) {
+  return hasAnyKeyword(questionLower, keywords, [
+    "report",
+    "reports",
+    "trip",
+    "cluster",
+    "clusters",
+    "travel",
+    "transport",
+    "meal",
+    "meals",
+    "software",
+    "subscription",
+    "subscriptions",
+    "entertainment",
+  ]);
+}
+
+function hasAnyKeyword(questionLower: string, keywords: string[], candidates: string[]) {
+  return candidates.some(
+    (candidate) => questionLower.includes(candidate) || keywords.includes(candidate),
+  );
+}
+
+function extractAmountFilter(questionLower: string): AmountFilter | null {
+  const match = questionLower.match(
+    /\b(above|over|greater than|more than|under|below|less than)\s+\$?\s*([0-9]+(?:[.,][0-9]{1,2})?)/,
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const direction: AmountFilter["direction"] =
+    match[1] === "under" || match[1] === "below" || match[1] === "less than" ? "below" : "above";
+  const amount = Number.parseFloat(match[2].replace(/,/g, ""));
+
+  if (!Number.isFinite(amount)) {
+    return null;
+  }
+
+  return { direction, amount };
+}
+
+function isScopeReferenceQuestion(questionLower: string) {
+  return [
+    "this category",
+    "that category",
+    "these transactions",
+    "those transactions",
+    "this report",
+    "that report",
+    "this spend",
+    "that spend",
+    "this cluster",
+    "that cluster",
+  ].some((term) => questionLower.includes(term));
+}
+
+function isFollowUpDetailQuestion(questionLower: string) {
+  return [
+    "more detail",
+    "more details",
+    "breakdown",
+    "give me the list",
+    "show me the list",
+    "which ones",
+    "what are they",
+    "these transactions",
+    "that category",
+    "this category",
+    "this report",
+    "that report",
+    "this cluster",
+    "that cluster",
+  ].some((term) => questionLower.includes(term));
+}
+
+function resolveConversationScope(messages: AssistantConversationMessage[]): ConversationScope {
+  const userMessages = messages
+    .filter((message) => message.role === "user")
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const latestUserMessage = userMessages.at(-1)?.toLowerCase() ?? "";
+  const latestMonthYear = extractMonthYear(latestUserMessage);
+  const latestReportType = extractRequestedReportType(latestUserMessage);
+  const latestAmountFilter = extractAmountFilter(latestUserMessage);
+  let inheritedMonthYear: string | null = null;
+  let inheritedReportType: ExpenseReport["type"] | null = null;
+
+  for (const message of userMessages.slice(0, -1)) {
+    const lowerMessage = message.toLowerCase();
+    const monthYear = extractMonthYear(lowerMessage);
+    const reportType = extractRequestedReportType(lowerMessage);
+
+    if (monthYear) {
+      inheritedMonthYear = monthYear;
+    }
+
+    if (reportType) {
+      inheritedReportType = reportType;
+    }
+  }
+
+  const shouldInheritScope =
+    isScopeReferenceQuestion(latestUserMessage) ||
+    (isFollowUpDetailQuestion(latestUserMessage) && (!latestMonthYear || !latestReportType));
+
+  return {
+    monthYear: latestMonthYear ?? (shouldInheritScope ? inheritedMonthYear : null),
+    reportType: latestReportType ?? (shouldInheritScope ? inheritedReportType : null),
+    amountFilter: latestAmountFilter,
+  };
+}
+
+function findScopedReport(questionLower: string, reports: ExpenseReport[]) {
+  const monthYear = extractMonthYear(questionLower);
+  const requestedType = extractRequestedReportType(questionLower);
+
+  const scoredReports = reports
+    .map((report) => {
+      let score = 0;
+
+      if (requestedType && report.type === requestedType) {
+        score += 6;
+      }
+
+      if (monthYear && report.startDate.startsWith(monthYear)) {
+        score += 5;
+      }
+
+      if (monthYear && report.endDate.startsWith(monthYear)) {
+        score += 3;
+      }
+
+      const haystack = [
+        report.title,
+        report.type,
+        report.merchantSummary.join(" "),
+        report.categorySummary.join(" "),
+        report.rationale.join(" "),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      if (requestedType) {
+        for (const keyword of REPORT_TYPE_KEYWORDS[requestedType]) {
+          if (haystack.includes(keyword)) {
+            score += 2;
+          }
+        }
+      }
+
+      return { report, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || b.report.endDate.localeCompare(a.report.endDate));
+
+  return scoredReports[0]?.report;
+}
+
+function findReportForScope(scope: ConversationScope, reports: ExpenseReport[]) {
+  if (!scope.monthYear && !scope.reportType) {
+    return null;
+  }
+
+  const scoredReports = reports
+    .map((report) => {
+      let score = 0;
+
+      if (scope.reportType && report.type === scope.reportType) {
+        score += 6;
+      }
+
+      if (scope.monthYear && report.startDate.startsWith(scope.monthYear)) {
+        score += 5;
+      }
+
+      if (scope.monthYear && report.endDate.startsWith(scope.monthYear)) {
+        score += 3;
+      }
+
+      return { report, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || b.report.endDate.localeCompare(a.report.endDate));
+
+  return scoredReports[0]?.report ?? null;
+}
+
+function extractMonthYear(questionLower: string) {
+  for (const [index, month] of MONTH_NAMES.entries()) {
+    if (!questionLower.includes(month)) {
+      continue;
+    }
+
+    const yearMatch = questionLower.match(/\b(20\d{2})\b/);
+    const fallbackYear = inferYearForMonth(month, yearMatch?.[1]);
+    if (!fallbackYear) {
+      continue;
+    }
+
+    return `${fallbackYear}-${String(index + 1).padStart(2, "0")}`;
+  }
+
+  return null;
+}
+
+function inferYearForMonth(month: string, explicitYear?: string) {
+  if (explicitYear) {
+    return explicitYear;
+  }
+
+  const monthIndex = MONTH_NAMES.indexOf(month as (typeof MONTH_NAMES)[number]);
+  if (monthIndex < 0) {
+    return null;
+  }
+
+  return monthIndex >= 7 ? "2025" : "2026";
+}
+
+function extractRequestedReportType(questionLower: string): ExpenseReport["type"] | null {
+  for (const [type, terms] of Object.entries(REPORT_TYPE_KEYWORDS) as Array<
+    [ExpenseReport["type"], string[]]
+  >) {
+    if (terms.some((term) => questionLower.includes(term))) {
+      return type;
+    }
+  }
+
+  return null;
+}
+
+function findTransactionsByConversationFilters(
+  questionLower: string,
+  transactions: NormalizedTransaction[],
+) {
+  const monthYear = extractMonthYear(questionLower);
+  const requestedType = extractRequestedReportType(questionLower);
+
+  return transactions
+    .filter((transaction) => {
+      if (monthYear && !transaction.date.startsWith(monthYear)) {
+        return false;
+      }
+
+      if (!requestedType) {
+        return true;
+      }
+
+      return transactionMatchesReportType(transaction, requestedType);
+    })
+    .sort((a, b) => b.amount - a.amount || b.date.localeCompare(a.date));
+}
+
+function findTransactionsByScope(scope: ConversationScope, transactions: NormalizedTransaction[]) {
+  if (!scope.monthYear && !scope.reportType) {
+    return [];
+  }
+
+  return transactions
+    .filter((transaction) => {
+      if (scope.monthYear && !transaction.date.startsWith(scope.monthYear)) {
+        return false;
+      }
+
+      if (!scope.reportType) {
+        return true;
+      }
+
+      return transactionMatchesReportType(transaction, scope.reportType);
+    })
+    .sort((a, b) => b.amount - a.amount || b.date.localeCompare(a.date));
+}
+
+function transactionMatchesReportType(
+  transaction: NormalizedTransaction,
+  reportType: ExpenseReport["type"],
+) {
+  const haystack = `${transaction.merchant} ${transaction.description} ${transaction.category ?? ""}`.toLowerCase();
+  return REPORT_TYPE_KEYWORDS[reportType].some((term) => haystack.includes(term));
+}
+
+function applyAmountFilter(
+  transactions: NormalizedTransaction[],
+  filter: AmountFilter | null,
+) {
+  if (!filter) {
+    return transactions;
+  }
+
+  return transactions.filter((transaction) =>
+    filter.direction === "above"
+      ? transaction.amount >= filter.amount
+      : transaction.amount <= filter.amount,
+  );
+}
+
+function describeConversationScope(scope: ConversationScope) {
+  const readableType = scope.reportType ? formatReportType(scope.reportType) : "Scoped workbook transactions";
+
+  if (scope.monthYear) {
+    return `${readableType} for ${formatMonthYear(scope.monthYear)}`;
+  }
+
+  return readableType;
+}
+
+function formatMonthYear(value: string) {
+  const [year, month] = value.split("-");
+  const monthIndex = Number(month) - 1;
+  const monthName = MONTH_NAMES[monthIndex] ?? value;
+  return `${capitalize(monthName)} ${year}`;
 }
 
 function severityRank(value: ComplianceFlag["severity"]) {
