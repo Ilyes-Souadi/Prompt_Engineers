@@ -1,5 +1,7 @@
-import { BRIM_POLICY } from "@/lib/policy/brim-policy";
+import { buildExpenseReports } from "@/lib/expense-reports/build-expense-reports";
 import { formatCurrency, formatPercent } from "@/lib/transactions/format";
+import type { ExpenseReport } from "@/types/expense-report";
+import type { PolicyDocument } from "@/lib/policy/load-policy-document";
 import type {
   ComplianceFlag,
   DashboardData,
@@ -42,13 +44,19 @@ const MAX_RELEVANT_TRANSACTIONS = 8;
 const MAX_RELEVANT_FLAGS = 8;
 const MAX_LARGEST_TRANSACTIONS = 5;
 const MAX_FLAG_HIGHLIGHTS = 5;
+const MAX_POLICY_CHUNKS = 6;
+const MAX_RELEVANT_REPORTS = 5;
 
 export function buildAssistantSystemPrompt(
   question: string,
   dashboard: DashboardData,
+  policyDocument: PolicyDocument,
 ): string {
+  const expenseReports = buildExpenseReports(dashboard.transactions, dashboard.compliance.flags);
   const relevantTransactions = findRelevantTransactions(question, dashboard.transactions);
   const relevantFlags = findRelevantFlags(question, dashboard.compliance.flags);
+  const relevantPolicyChunks = findRelevantPolicyChunks(question, policyDocument);
+  const relevantReports = findRelevantReports(question, expenseReports);
   const largestTransactions = [...dashboard.transactions]
     .filter((transaction) => transaction.amount > 0)
     .sort((a, b) => b.amount - a.amount || b.date.localeCompare(a.date))
@@ -59,21 +67,24 @@ export function buildAssistantSystemPrompt(
   const topFlagTypes = dashboard.compliance.summary.flagTypeCounts.slice(0, 5);
   const countryMix = dashboard.summary.countryBreakdown.slice(0, 5);
   const topMerchants = dashboard.summary.topMerchants.slice(0, 5);
+  const reportStatusCounts = summarizeReportStatuses(expenseReports);
+  const topReportTypes = summarizeReportTypes(expenseReports);
 
   return [
     "You are the Brim Expense Intelligence finance copilot.",
-    "Answer only with facts grounded in the loaded workbook data and the explicit Brim policy rules below.",
-    "Do not invent transactions, policy rules, approvals, receipts, employees, or reimbursements.",
-    "Treat the compliance classifications and severities as deterministic outputs from the local rule engine.",
+    "Answer only with facts grounded in source documents that exist in this project.",
+    "Approved source documents for this answer are the workbook transaction file and the Brim policy document loaded below.",
+    "You may use deterministic dashboard, compliance, and expense-report outputs only when they are derived from those source documents.",
+    "Do not invent transactions, policy rules, approvals, receipts, employees, reimbursements, or workflow history that is not present in the grounded context.",
+    "Treat deterministic engine outputs as source-of-truth interpretations derived from the workbook and policy documents, not as model opinions.",
     "If the available context does not support a confident answer, say that clearly.",
     "Separate facts from interpretation with phrasing like 'The loaded data shows...' or 'This may suggest...'.",
     "Keep the answer concise and demo-friendly.",
     "",
-    "Grounded policy rules:",
-    `- ${BRIM_POLICY.preAuthorizationReference}`,
-    `- ${BRIM_POLICY.receiptsReference}`,
-    `- ${BRIM_POLICY.cardFeeReference}`,
-    `- ${BRIM_POLICY.abuseReference}`,
+    "Grounding provenance:",
+    `- Workbook source: ${dashboard.source.datasetName}`,
+    `- Policy source: ${policyDocument.sourcePath}`,
+    `- Policy source type: ${policyDocument.sourceType}`,
     "",
     "Workbook snapshot:",
     `- Dataset: ${dashboard.source.datasetName}`,
@@ -109,6 +120,18 @@ export function buildAssistantSystemPrompt(
     `- Info items: ${dashboard.compliance.summary.classificationCounts.info}`,
     `- High severity flags: ${dashboard.compliance.summary.severityCounts.high}`,
     "",
+    "Expense report snapshot:",
+    `- Generated reports: ${expenseReports.length}`,
+    `- Ready reports: ${reportStatusCounts.ready}`,
+    `- Review reports: ${reportStatusCounts.review}`,
+    `- Investigate reports: ${reportStatusCounts.investigate}`,
+    ...topReportTypes.map((entry) => `- ${formatReportType(entry.type)}: ${entry.count}`),
+    "",
+    relevantPolicyChunks.length > 0
+      ? "Relevant policy excerpts from the source document:"
+      : "Relevant policy excerpts from the source document: none matched directly",
+    ...relevantPolicyChunks.map((chunk) => `- ${chunk.text}`),
+    "",
     "Most common flag types:",
     ...topFlagTypes.map(
       (flagType) => `- ${formatFlagType(flagType.flagType)}: ${flagType.count}`,
@@ -129,6 +152,11 @@ export function buildAssistantSystemPrompt(
       ? "Relevant compliance flags for the latest user question:"
       : "Relevant compliance flags for the latest user question: none matched directly",
     ...relevantFlags.map(summarizeFlag),
+    "",
+    relevantReports.length > 0
+      ? "Relevant expense reports derived from workbook transactions:"
+      : "Relevant expense reports derived from workbook transactions: none matched directly",
+    ...relevantReports.map(summarizeReport),
   ].join("\n");
 }
 
@@ -274,7 +302,115 @@ function summarizeFlag(flag: ComplianceFlag) {
   )} | ${capitalize(flag.severity)} | ${formatFlagType(flag.flagType)} | ${flag.explanation}`;
 }
 
+function findRelevantPolicyChunks(question: string, policyDocument: PolicyDocument) {
+  const keywords = extractKeywords(question);
+  const weightedChunks =
+    keywords.length === 0
+      ? policyDocument.chunks.map((chunk) => ({ chunk, score: 1 }))
+      : policyDocument.chunks.map((chunk) => ({
+          chunk,
+          score: keywords.reduce((score, keyword) => {
+            const lowerChunk = chunk.text.toLowerCase();
+
+            if (lowerChunk.includes(keyword)) {
+              return score + 3;
+            }
+
+            return score;
+          }, 0),
+        }));
+
+  return weightedChunks
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.chunk.id.localeCompare(b.chunk.id))
+    .slice(0, MAX_POLICY_CHUNKS)
+    .map((item) => item.chunk);
+}
+
+function findRelevantReports(question: string, reports: ExpenseReport[]) {
+  const keywords = extractKeywords(question);
+
+  if (keywords.length === 0) {
+    return reports.slice(0, Math.min(reports.length, MAX_RELEVANT_REPORTS));
+  }
+
+  return reports
+    .map((report) => ({
+      report,
+      score: scoreReport(report, keywords),
+    }))
+    .filter((item) => item.score > 0)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        b.report.endDate.localeCompare(a.report.endDate) ||
+        b.report.totalAmount - a.report.totalAmount,
+    )
+    .slice(0, MAX_RELEVANT_REPORTS)
+    .map((item) => item.report);
+}
+
+function scoreReport(report: ExpenseReport, keywords: string[]) {
+  const haystack = [
+    report.title,
+    report.type,
+    report.status,
+    report.merchantSummary.join(" "),
+    report.categorySummary.join(" "),
+    report.rationale.join(" "),
+    ...report.findings.map((finding) => `${finding.title} ${finding.detail}`),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return keywords.reduce((score, keyword) => {
+    if (haystack.includes(keyword)) {
+      return score + 3;
+    }
+
+    return score;
+  }, 0);
+}
+
+function summarizeReport(report: ExpenseReport) {
+  return `- ${report.title} | ${formatReportType(report.type)} | ${capitalize(
+    report.status,
+  )} | ${formatCurrency(report.totalAmount)} | ${report.transactionCount} transactions | ${
+    report.rationale[0] ?? "No rationale available."
+  }`;
+}
+
+function summarizeReportStatuses(reports: ExpenseReport[]) {
+  return reports.reduce(
+    (counts, report) => {
+      counts[report.status] += 1;
+      return counts;
+    },
+    { ready: 0, review: 0, investigate: 0 },
+  );
+}
+
+function summarizeReportTypes(reports: ExpenseReport[]) {
+  const counts = new Map<ExpenseReport["type"], number>();
+
+  for (const report of reports) {
+    counts.set(report.type, (counts.get(report.type) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+}
+
 function formatFlagType(value: ComplianceFlag["flagType"]) {
+  return value
+    .split("_")
+    .map(capitalize)
+    .join(" ");
+}
+
+function formatReportType(value: ExpenseReport["type"]) {
   return value
     .split("_")
     .map(capitalize)

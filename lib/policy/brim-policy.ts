@@ -1,3 +1,5 @@
+// Deterministic policy constants remain here for the rule engines.
+// The assistant prompt no longer treats this file as the source policy document.
 export const BRIM_POLICY = {
   preAuthorizationThreshold: 50,
   preAuthorizationReference:

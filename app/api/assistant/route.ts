@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { buildAssistantSystemPrompt } from "@/lib/assistant/build-grounding-context";
+import {
+  getExpectedPolicyDocumentPaths,
+  loadPolicyDocument,
+} from "@/lib/policy/load-policy-document";
 import { getDashboardData } from "@/lib/transactions/get-dashboard-data";
 import type {
   AssistantConversationMessage,
@@ -52,7 +56,19 @@ export async function POST(request: Request) {
   }
 
   const dashboard = await getDashboardData();
-  const systemPrompt = buildAssistantSystemPrompt(latestMessage.content, dashboard);
+  const policyDocument = await loadPolicyDocument();
+
+  if (!policyDocument) {
+    const { pdfPath, textPath } = getExpectedPolicyDocumentPaths();
+    return NextResponse.json(
+      {
+        error: `Assistant grounding requires a real Brim policy source document. Add ${pdfPath} or ${textPath} before asking Claude policy-grounded questions.`,
+      },
+      { status: 503 },
+    );
+  }
+
+  const systemPrompt = buildAssistantSystemPrompt(latestMessage.content, dashboard, policyDocument);
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

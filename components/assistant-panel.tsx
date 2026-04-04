@@ -169,8 +169,9 @@ export function AssistantPanel({
 
         <div className="assistant-form-footer">
           <p className="assistant-note">
-            Claude answers only from the local workbook and policy context. If
-            `ANTHROPIC_API_KEY` is missing, the route returns a setup error instead of a fake answer.
+            Claude answers only from repo-backed source documents and deterministic outputs derived
+            from them. If `ANTHROPIC_API_KEY` or the Brim policy source document is missing, the
+            route returns a setup error instead of a fake answer.
           </p>
           <button
             type="submit"

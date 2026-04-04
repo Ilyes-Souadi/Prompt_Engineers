@@ -1,9 +1,9 @@
 # Brim Expense Intelligence
 
 - Project name: Brim Expense Intelligence
-- Current status: The app now simulates employee and manager roles with a lightweight persistent request workflow and a manager-facing expense reports surface built from historical workbook transactions
-- Current active slice: Expense report generation from workbook-backed historical transactions
-- Next planned step: Add lightweight manager-side follow-up actions around reports only if needed, while keeping exports and heavy workflow infrastructure out of scope
+- Current status: The app now simulates employee and manager roles with a lightweight persistent request workflow, a manager-facing expense reports surface, and a live Claude assistant grounded in the workbook plus a repo-backed policy document
+- Current active slice: Live source-document-grounded assistant
+- Next planned step: Broaden grounded assistant coverage to newer deterministic slices only if needed, while keeping AI explanation-only and avoiding heavy RAG
 
 ## 2026-04-02 21:22 - Establish product rules
 - Slice: Foundation / Applies to all slices
@@ -100,3 +100,21 @@
 - Change: Added a manager-only Expense Reports route and tab, a deterministic report builder over workbook-backed historical transactions, and a master-detail reports view with grouped report cards, report detail, report findings, and readiness states.
 - Reason: Turn raw historical transactions into reviewable expense report objects that represent business events or spend clusters instead of forcing managers to inspect single transactions one by one.
 - Notes: Report grouping uses deterministic date proximity plus merchant/category keyword heuristics for trip, transport, meals, software, and general spend. Report findings reuse historical compliance flags where possible and derive a report status of `ready`, `review`, or `investigate`. Validation: `npm run lint` and `npm run build` both passed.
+
+## 2026-04-04 00:28 - Tighten assistant grounding to source-document provenance
+- Slice: 2 hardening
+- Change: Added a server-side policy document loader with stable expected paths under `data/policy/`, refactored assistant grounding to require a real policy source document instead of relying on handwritten policy prompt text, and expanded grounded context to include deterministic expense report summaries derived from the workbook.
+- Reason: Ensure Claude answers are grounded only in repo-backed source documents and deterministic outputs derived from those documents, without introducing heavy RAG infrastructure.
+- Notes: The workbook remains the live transaction source document. The assistant route now expects a real policy document under `data/policy/`, with runtime grounding reading the extracted `brim-expense-policy.txt` companion derived from the PDF. Validation: `npm run lint` and `npm run build` both passed.
+
+## 2026-04-04 00:42 - Activate live policy-grounded assistant locally
+- Slice: 2 activation
+- Change: Added the Brim policy PDF into `data/policy/`, generated a text companion from that source document for stable server-side runtime grounding, configured the local Anthropic environment, and smoke-tested `/api/assistant` successfully with a live Claude response.
+- Reason: Complete the source-document-grounded assistant path end to end on the local machine without introducing heavy retrieval infrastructure or weakening provenance rules.
+- Notes: The assistant now answers from the workbook plus the repo-backed policy document and deterministic outputs derived from them. The local `.env.local` remains untracked and should not be committed.
+
+## 2026-04-04 00:49 - Switch local assistant model to Claude Haiku 4.5
+- Slice: 2 local config
+- Change: Updated the local assistant model override in `.env.local` from Sonnet to the stable Claude Haiku 4.5 model identifier.
+- Reason: Use a lighter Claude model for the local grounded assistant without changing the route contract or deterministic grounding architecture.
+- Notes: This is a local environment change only; the tracked route default remains unchanged unless explicitly updated later.
