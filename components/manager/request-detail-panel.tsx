@@ -32,14 +32,10 @@ export function RequestDetailPanel({
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="section-kicker">Request detail</p>
-            <h2>Select a request</h2>
+            <h2>No request selected</h2>
           </div>
         </div>
-        <p className="muted-line">
-          Pick a request from the manager queue to inspect the full evaluation and record a
-          manager decision.
-        </p>
+        <p className="muted-line">Select a request from the list.</p>
       </section>
     );
   }
@@ -49,21 +45,20 @@ export function RequestDetailPanel({
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="section-kicker">Current request status</p>
-            <h2>{formatRequestStatus(request.status)}</h2>
+            <h2>{request.evaluation.request.employeeName}</h2>
           </div>
           <span className="muted-line">Submitted {formatDateTime(request.submittedAt)}</span>
         </div>
         <ul className="quality-list">
-          <li>System recommendation: {request.systemRecommendation}</li>
-          <li>Current status bucket: {formatRequestStatus(request.status)}</li>
+          <li>Status: {formatRequestStatus(request.status)}</li>
+          <li>Recommendation: {request.systemRecommendation}</li>
           {request.managerDecision ? (
             <li>
-              Latest manager decision: {request.managerDecision.decision} at{" "}
+              Manager decision: {request.managerDecision.decision} at{" "}
               {formatDateTime(request.managerDecision.decidedAt)}
             </li>
           ) : (
-            <li>No manager decision has been recorded yet.</li>
+            <li>No manager decision recorded.</li>
           )}
         </ul>
       </section>
@@ -71,8 +66,7 @@ export function RequestDetailPanel({
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="section-kicker">Request details</p>
-            <h2>Submitted request context</h2>
+            <h2>Request details</h2>
           </div>
         </div>
         <dl className="pre-approval-summary-list">

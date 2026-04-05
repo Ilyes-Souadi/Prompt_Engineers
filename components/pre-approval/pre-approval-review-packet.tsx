@@ -19,14 +19,10 @@ export function PreApprovalReviewPacket({ evaluation }: PreApprovalReviewPacketP
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="section-kicker">Review packet</p>
-            <h2>Advisory recommendation</h2>
+            <h2>Decision support</h2>
           </div>
         </div>
-        <p className="muted-line">
-          Submit a request to see the recommendation state, grouped checks, required follow-ups,
-          and reviewer context.
-        </p>
+        <p className="muted-line">Submit a request to load the review packet.</p>
       </section>
     );
   }
@@ -37,11 +33,10 @@ export function PreApprovalReviewPacket({ evaluation }: PreApprovalReviewPacketP
     <section className="panel">
       <div className="panel-header">
         <div>
-          <p className="section-kicker">Review packet</p>
-          <h2>Advisory recommendation</h2>
+          <h2>Decision support</h2>
         </div>
         <div className="recommendation-header-block">
-          <span className="muted-line">System recommendation</span>
+          <span className="muted-line">Recommendation</span>
           <RecommendationBadge recommendation={evaluation.recommendation} />
         </div>
       </div>
@@ -73,8 +68,7 @@ export function PreApprovalReviewPacket({ evaluation }: PreApprovalReviewPacketP
         <section className="panel pre-approval-nested-panel">
           <div className="panel-header">
             <div>
-              <p className="section-kicker">Request summary</p>
-              <h2>Submitted request</h2>
+              <h2>Request</h2>
             </div>
           </div>
           <dl className="pre-approval-summary-list">
@@ -118,8 +112,7 @@ export function PreApprovalReviewPacket({ evaluation }: PreApprovalReviewPacketP
         <section className="panel pre-approval-nested-panel">
           <div className="panel-header">
             <div>
-              <p className="section-kicker">Rationale</p>
-              <h2>Why this recommendation</h2>
+              <h2>Rationale</h2>
             </div>
           </div>
           <ul className="quality-list">
@@ -134,8 +127,7 @@ export function PreApprovalReviewPacket({ evaluation }: PreApprovalReviewPacketP
         <section className="panel pre-approval-nested-panel">
           <div className="panel-header">
             <div>
-              <p className="section-kicker">Required follow-up</p>
-              <h2>Reviewer actions</h2>
+              <h2>Required follow-up</h2>
             </div>
           </div>
           {evaluation.requiredActions.length > 0 ? (
@@ -152,8 +144,7 @@ export function PreApprovalReviewPacket({ evaluation }: PreApprovalReviewPacketP
         <section className="panel pre-approval-nested-panel">
           <div className="panel-header">
             <div>
-              <p className="section-kicker">Reviewer context</p>
-              <h2>Budget and history</h2>
+              <h2>Context</h2>
             </div>
           </div>
           <ul className="quality-list">
@@ -171,7 +162,7 @@ export function PreApprovalReviewPacket({ evaluation }: PreApprovalReviewPacketP
             ) : null}
           </ul>
           <div className="pre-approval-data-notes">
-            <p className="muted-line">Data source notes</p>
+            <p className="muted-line">Data notes</p>
             <ul className="quality-list">
               {evaluation.reviewerContext.dataSourceNotes.map((note) => (
                 <li key={note}>{note}</li>
@@ -189,7 +180,6 @@ export function PreApprovalReviewPacket({ evaluation }: PreApprovalReviewPacketP
             <section key={group} className="panel pre-approval-nested-panel">
               <div className="panel-header">
                 <div>
-                  <p className="section-kicker">Findings</p>
                   <h2>{group.charAt(0).toUpperCase() + group.slice(1)}</h2>
                 </div>
                 <span className="muted-line">{checks.length} checks</span>
@@ -223,10 +213,6 @@ export function PreApprovalReviewPacket({ evaluation }: PreApprovalReviewPacketP
           );
         })}
       </div>
-
-      <p className="pre-approval-advisory-note">
-        System recommendation is advisory. Final decision remains with the reviewer.
-      </p>
     </section>
   );
 }

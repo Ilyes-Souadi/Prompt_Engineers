@@ -20,7 +20,6 @@ export function ExpenseReportList({
     <section className="panel manager-request-list-panel">
       <div className="panel-header">
         <div>
-          <p className="section-kicker">Expense reports</p>
           <h2>{title}</h2>
         </div>
         <span className="muted-line">{reports.length}</span>

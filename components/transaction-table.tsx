@@ -10,8 +10,8 @@ export function TransactionTable({ transactions }: TransactionTableProps) {
     <section className="transactions-panel">
       <div className="transactions-header">
         <div>
-          <p className="section-kicker">Transactions</p>
-          <h2>Normalized ledger view</h2>
+          <p className="section-kicker">Ledger</p>
+          <h2>Recent transactions</h2>
         </div>
         <span className="muted-line">Latest {transactions.length} records shown</span>
       </div>

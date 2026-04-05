@@ -10,7 +10,7 @@ export function RegionBreakdown({ regions }: RegionBreakdownProps) {
     <section className="panel">
       <div className="panel-header">
         <div>
-          <p className="section-kicker">Geography</p>
+          <p className="section-kicker">Locations</p>
           <h2>Country breakdown</h2>
         </div>
       </div>

@@ -21,7 +21,6 @@ export function RequestList({
     <section className="panel manager-request-list-panel">
       <div className="panel-header">
         <div>
-          <p className="section-kicker">Requests</p>
           <h2>{title}</h2>
         </div>
         <span className="muted-line">{requests.length}</span>
@@ -53,7 +52,7 @@ export function RequestList({
                 {formatDate(request.submittedAt)}
               </p>
               <p className="muted-line">
-                System recommendation: {request.systemRecommendation}
+                Recommendation: {request.systemRecommendation}
               </p>
             </button>
           ))

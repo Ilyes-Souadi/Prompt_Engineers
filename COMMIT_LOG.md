@@ -2,7 +2,7 @@
 
 - Project name: Brim Expense Intelligence
 - Current status: The app now simulates employee and manager roles with a lightweight persistent request workflow, a manager-facing expense reports surface, and a live Claude assistant grounded in the workbook plus a repo-backed policy document
-- Current active slice: Documentation and handoff polish
+- Current active slice: Improve assistant ad-hoc cluster retrieval
 - Next planned step: Refine additional assistant query patterns only if needed, while keeping the assistant grounded in the workbook/policy documents and avoiding heavy RAG
 
 ## 2026-04-02 21:22 - Establish product rules
@@ -131,8 +131,50 @@
 - Reason: Make the repo easier to review, demo, and hand off without needing to reconstruct the product from multiple implementation files.
 - Notes: The README is intentionally high-level and product-oriented, while `PROJECT_RULES.md` remains the source of truth and `COMMIT_LOG.md` remains the chronological project memory.
 
+## 2026-04-04 03:09 - Add deterministic amount-range clusters for assistant answers
+- Slice: 2 retrieval refinement
+- Change: Added a reusable transaction-cluster model and helper for deterministic ad-hoc cluster queries, extended the assistant grounding layer to support explicit amount-range requests like `between 100 and 150`, `above 1000`, and scoped variants such as month plus report-type filters, and updated the assistant route to allow longer plain-text cluster continuations in chat. Cluster retrieval now uses workbook-style displayed transaction magnitudes so in-range credit rows are not silently dropped from count-based cluster queries.
+- Reason: Fix incomplete assistant answers for dataset-wide numeric range questions by letting the server build exact transaction sets from the full workbook before Claude responds, instead of relying on keyword-matched samples or broad report fallbacks.
+- Notes: Validation: `npm run lint` and `npm run build` both passed. Live assistant checks now return 344 transactions totaling `$42,681.30` for the `100–150` range, include the row-23 `$119.48` example in the preview, preserve December sub-filtering, and keep explicit amount-range queries from falling back to noisy report clusters.
+
 ## 2026-04-04 00:49 - Switch local assistant model to Claude Haiku 4.5
 - Slice: 2 local config
 - Change: Updated the local assistant model override in `.env.local` from Sonnet to the stable Claude Haiku 4.5 model identifier.
 - Reason: Use a lighter Claude model for the local grounded assistant without changing the route contract or deterministic grounding architecture.
 - Notes: This is a local environment change only; the tracked route default remains unchanged unless explicitly updated later.
+
+## 2026-04-04 10:18 - Simplify manager and employee workspace UX
+- Slice: UX refinement across slices 1, 4, and 5
+- Change: Simplified the main shell by removing the duplicate in-page manager view toggle, tightening top navigation labels, and restructuring the manager dashboard into a clearer overview plus assistant layout with fewer simultaneous sections. Employee mode now presents a single focused new-expense workflow, while manager request and expense report screens were refactored from multi-column status walls into cleaner status-filtered list-plus-detail workspaces.
+- Reason: Reduce information overload on the main boards so the demo is easier to understand quickly while preserving the manager/employee role split and the existing deterministic workflow architecture.
+- Notes: Validation: `npm run lint` and `npm run build` both passed. The existing Turbopack tracing warning tied to `next.config.ts` and the policy document loader still appears during build and was not introduced by this UX change.
+
+## 2026-04-04 10:32 - Compress assistant panel and fix internal scrolling
+- Slice: 2 UX refinement
+- Change: Reduced the manager assistant panel to the essentials by removing the extra header, status, stats, and setup copy, leaving the recommended questions, conversation area, message box, and submit button. Updated assistant panel layout and overflow behavior so the panel stays compact and its message area scrolls inside the panel instead of forcing the whole page to scroll first.
+- Reason: Make the Claude surface easier to reach and use during demos by cutting non-essential content and improving chat ergonomics on the dashboard.
+- Notes: Validation: `npm run lint` and `npm run build` both passed. The pre-existing Turbopack tracing warning during build remains unchanged.
+
+## 2026-04-04 10:45 - Shift dashboard from presentation style to product UI
+- Slice: UX refinement across slices 1 and 2
+- Change: Reduced the visual weight of top-level summary metrics by converting them into compact cards, removed more tutorial-style explanatory copy from the manager and employee workspace, and reworked the main dashboard content into a more operational overview layout with findings, merchants, geography, compliance, and ledger sections labeled more like a live product.
+- Reason: Make the app feel closer to a deployed internal tool and less like a feature presentation, while keeping the same deterministic architecture and manager/employee workflow split.
+- Notes: Validation: `npm run lint` and `npm run build` both passed. The existing Turbopack tracing warning tied to assistant/policy file tracing still appears and was not introduced by this UI refinement.
+
+## 2026-04-04 10:53 - Restore full manager override authority in request decisions
+- Slice: 4 bugfix
+- Change: Fixed the manager request board so the currently visible request can always be changed to any final decision state, instead of silently snapping back to the system recommendation when the default selected request had not been explicitly clicked first. Also reset local decision draft state when switching request-status tabs.
+- Reason: The system recommendation is advisory only, and the manager must remain the final decision-maker for every request.
+- Notes: Validation: `npm run lint` and `npm run build` both passed. The existing Turbopack tracing warning during build remains unchanged.
+
+## 2026-04-04 11:08 - Refine the interface toward a production-style finance app
+- Slice: UX refinement across manager and employee surfaces
+- Change: Reworked the visual system from a warm presentation-like look into a cleaner app shell with modern sans typography, lighter surfaces, subtler status chrome, and tighter navigation/header treatment. Removed more tutorial-style copy and verbose empty states from request, report, and pre-approval detail panels so the screens read like working product surfaces rather than narrated demo sections.
+- Reason: Keep all existing functionality while making the app feel closer to a deployed internal finance product and removing UI elements that are not necessary in normal usage.
+- Notes: Validation: `npm run lint` and `npm run build` both passed. The existing Turbopack tracing warning tied to assistant/policy file tracing still appears and was not introduced by this pass.
+
+## 2026-04-04 11:17 - Replace top merchants table with a dashboard column chart
+- Slice: Dashboard UX refinement
+- Change: Replaced the manager dashboard's top-merchants table with a lightweight CSS-based column chart that shows merchant spend visually while still keeping spend amount and share labels on each bar.
+- Reason: Make the dashboard faster to scan and more visually useful in normal app usage without adding dependencies or changing any data logic.
+- Notes: Validation: `npm run lint` and `npm run build` both passed. The existing Turbopack tracing warning during build remains unchanged.

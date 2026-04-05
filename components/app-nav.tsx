@@ -13,14 +13,14 @@ export function AppNav({ currentPath, role }: AppNavProps) {
           href="/"
           className={`app-nav-link ${currentPath === "/" ? "is-active" : ""}`}
         >
-          Historical dashboard
+          Dashboard
         </Link>
       ) : null}
       <Link
         href="/pre-approval"
         className={`app-nav-link ${currentPath === "/pre-approval" ? "is-active" : ""}`}
       >
-        {role === "manager" ? "Requests" : "Pre-Approval"}
+        {role === "manager" ? "New Requests" : "New Expense"}
       </Link>
       {role === "manager" ? (
         <Link

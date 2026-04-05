@@ -16,28 +16,59 @@ const statusSections: Array<{ status: ExpenseReportStatus; title: string }> = [
 ];
 
 export function ExpenseReportsBoard({ reports }: ExpenseReportsBoardProps) {
+  const [activeStatus, setActiveStatus] = useState<ExpenseReportStatus>("review");
   const [selectedReportId, setSelectedReportId] = useState<string | undefined>(undefined);
+  const visibleReports = useMemo(
+    () => reports.filter((report) => report.status === activeStatus),
+    [activeStatus, reports],
+  );
   const selectedReport = useMemo(
-    () => reports.find((report) => report.id === selectedReportId) ?? reports[0],
-    [reports, selectedReportId],
+    () => visibleReports.find((report) => report.id === selectedReportId) ?? visibleReports[0],
+    [selectedReportId, visibleReports],
   );
 
   return (
-    <div className="manager-board-layout">
-      <div className="manager-status-grid manager-report-grid">
-        {statusSections.map((section) => (
+    <div className="manager-board-shell">
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="section-kicker">Historical reports</p>
+            <h2>Review grouped expense reports</h2>
+          </div>
+          <span className="muted-line">{reports.length} total reports</span>
+        </div>
+        <div className="classification-tabs" role="tablist" aria-label="Expense report status filters">
+          {statusSections.map((section) => (
+            <button
+              key={section.status}
+              type="button"
+              className={`classification-tab ${activeStatus === section.status ? "is-active" : ""}`}
+              onClick={() => setActiveStatus(section.status)}
+            >
+              {section.title}
+              <span className="classification-count">
+                {reports.filter((report) => report.status === section.status).length}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <div className="manager-board-layout manager-board-layout-split">
+        <div className="manager-board-list-column">
           <ExpenseReportList
-            key={section.status}
-            title={section.title}
-            status={section.status}
-            reports={reports.filter((report) => report.status === section.status)}
+            title={statusSections.find((section) => section.status === activeStatus)?.title ?? "Reports"}
+            status={activeStatus}
+            reports={visibleReports}
             selectedReportId={selectedReport?.id}
             onSelect={setSelectedReportId}
           />
-        ))}
-      </div>
+        </div>
 
-      <ExpenseReportDetail report={selectedReport} />
+        <div className="manager-board-detail-column">
+          <ExpenseReportDetail report={selectedReport} />
+        </div>
+      </div>
     </div>
   );
 }

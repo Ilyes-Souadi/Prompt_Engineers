@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     },
     body: JSON.stringify({
       model: DEFAULT_MODEL,
-      max_tokens: 700,
+      max_tokens: 1200,
       system: systemPrompt,
       messages,
     }),

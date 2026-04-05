@@ -24,10 +24,16 @@ const statusSections: Array<{ status: RequestWorkflowStatus; title: string }> = 
 ];
 
 export function RequestsBoard({ requests, onUpdateRequest }: RequestsBoardProps) {
+  const [activeStatus, setActiveStatus] = useState<RequestWorkflowStatus>("new");
   const [selectedRequestId, setSelectedRequestId] = useState<string | undefined>(undefined);
+  const visibleRequests = useMemo(
+    () => requests.filter((request) => request.status === activeStatus),
+    [activeStatus, requests],
+  );
   const selectedRequest = useMemo(
-    () => requests.find((request) => request.id === selectedRequestId) ?? requests[0],
-    [requests, selectedRequestId],
+    () =>
+      visibleRequests.find((request) => request.id === selectedRequestId) ?? visibleRequests[0],
+    [selectedRequestId, visibleRequests],
   );
   const [pendingDecision, setPendingDecision] = useState<ReviewerDecisionState | null>(null);
   const [managerNote, setManagerNote] = useState<string | null>(null);
@@ -38,7 +44,9 @@ export function RequestsBoard({ requests, onUpdateRequest }: RequestsBoardProps)
     selectedRequest?.systemRecommendation ??
     "review";
   const effectiveManagerNote =
-    managerNote ?? selectedRequest?.managerDecision?.reviewerNote ?? "";
+    managerNote ??
+    selectedRequest?.managerDecision?.reviewerNote ??
+    "";
 
   function handleSaveDecision() {
     if (!selectedRequest) {
@@ -73,29 +81,60 @@ export function RequestsBoard({ requests, onUpdateRequest }: RequestsBoardProps)
   }
 
   return (
-    <div className="manager-board-layout">
-      <div className="manager-status-grid">
-        {statusSections.map((section) => (
+    <div className="manager-board-shell">
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="section-kicker">Manager queue</p>
+            <h2>Review employee requests</h2>
+          </div>
+          <span className="muted-line">{requests.length} total requests</span>
+        </div>
+        <div className="classification-tabs" role="tablist" aria-label="Request status filters">
+          {statusSections.map((section) => (
+            <button
+              key={section.status}
+              type="button"
+              className={`classification-tab ${activeStatus === section.status ? "is-active" : ""}`}
+              onClick={() => {
+                setActiveStatus(section.status);
+                setSelectedRequestId(undefined);
+                setPendingDecision(null);
+                setManagerNote(null);
+              }}
+            >
+              {section.title}
+              <span className="classification-count">
+                {requests.filter((request) => request.status === section.status).length}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <div className="manager-board-layout manager-board-layout-split">
+        <div className="manager-board-list-column">
           <RequestList
-            key={section.status}
-            title={section.title}
-            status={section.status}
-            requests={requests.filter((request) => request.status === section.status)}
+            title={statusSections.find((section) => section.status === activeStatus)?.title ?? "Requests"}
+            status={activeStatus}
+            requests={visibleRequests}
             selectedRequestId={selectedRequest?.id}
             onSelect={handleSelectRequest}
           />
-        ))}
-      </div>
+        </div>
 
-      <RequestDetailPanel
-        request={selectedRequest}
-        pendingDecision={effectivePendingDecision}
-        managerNote={effectiveManagerNote}
-        onDecisionChange={setPendingDecision}
-        onManagerNoteChange={setManagerNote}
-        onSaveDecision={handleSaveDecision}
-        onResetDecision={handleResetDecision}
-      />
+        <div className="manager-board-detail-column">
+          <RequestDetailPanel
+            request={selectedRequest}
+            pendingDecision={effectivePendingDecision}
+            managerNote={effectiveManagerNote}
+            onDecisionChange={setPendingDecision}
+            onManagerNoteChange={setManagerNote}
+            onSaveDecision={handleSaveDecision}
+            onResetDecision={handleResetDecision}
+          />
+        </div>
+      </div>
     </div>
   );
 }

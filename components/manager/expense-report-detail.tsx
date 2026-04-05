@@ -13,13 +13,10 @@ export function ExpenseReportDetail({ report }: ExpenseReportDetailProps) {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="section-kicker">Expense report detail</p>
-            <h2>Select a generated report</h2>
+            <h2>No report selected</h2>
           </div>
         </div>
-        <p className="muted-line">
-          Pick a report from the list to inspect grouped transactions, report-level findings, and readiness state.
-        </p>
+        <p className="muted-line">Select a report from the list.</p>
       </section>
     );
   }
@@ -29,7 +26,6 @@ export function ExpenseReportDetail({ report }: ExpenseReportDetailProps) {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="section-kicker">Report overview</p>
             <h2>{report.title}</h2>
           </div>
           <span className={`recommendation-badge recommendation-${report.status}`}>
@@ -81,10 +77,8 @@ export function ExpenseReportDetail({ report }: ExpenseReportDetailProps) {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="section-kicker">Grouping rationale</p>
-            <h2>Why these transactions belong together</h2>
+            <h2>Grouping rationale</h2>
           </div>
-          <span className="muted-line">Deterministic report builder</span>
         </div>
         <ul className="quality-list">
           {report.rationale.map((item) => (
@@ -96,10 +90,8 @@ export function ExpenseReportDetail({ report }: ExpenseReportDetailProps) {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="section-kicker">Findings</p>
-            <h2>Compliance and workflow summary</h2>
+            <h2>Findings</h2>
           </div>
-          <span className="muted-line">Status is advisory for manager review</span>
         </div>
         <div className="pre-approval-check-list">
           {report.findings.length > 0 ? (
@@ -119,9 +111,6 @@ export function ExpenseReportDetail({ report }: ExpenseReportDetailProps) {
                     </span>
                   </div>
                 </div>
-                <p className="muted-line">
-                  Source: {finding.source === "compliance" ? "Historical compliance engine" : "Report grouping heuristic"}.
-                </p>
               </article>
             ))
           ) : (
@@ -135,8 +124,7 @@ export function ExpenseReportDetail({ report }: ExpenseReportDetailProps) {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="section-kicker">Included transactions</p>
-            <h2>Historical ledger rows in this report</h2>
+            <h2>Transactions</h2>
           </div>
           <span className="muted-line">{report.transactionCount}</span>
         </div>

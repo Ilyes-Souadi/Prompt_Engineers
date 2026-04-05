@@ -42,16 +42,13 @@ export function ReviewerDecisionPanel({
     return (
       <section className="panel">
         <div className="panel-header">
-        <div>
-          <p className="section-kicker">{actorLabel} decision</p>
-          <h2>Final action</h2>
+          <div>
+            <h2>{actorLabel} decision</h2>
+          </div>
         </div>
-      </div>
-      <p className="muted-line">
-          Evaluate a request first, then the {actorLabel.toLowerCase()} can record the final decision.
-      </p>
-    </section>
-  );
+        <p className="muted-line">Evaluate a request first.</p>
+      </section>
+    );
   }
 
   const differsFromRecommendation = pendingDecision !== evaluation.recommendation;
@@ -62,32 +59,27 @@ export function ReviewerDecisionPanel({
     <section className="panel">
       <div className="panel-header">
         <div>
-          <p className="section-kicker">{actorLabel} decision</p>
-          <h2>Final action</h2>
+          <h2>{actorLabel} decision</h2>
         </div>
-        <span className="muted-line">Human-owned outcome</span>
       </div>
 
       <div className="decision-comparison-grid">
         <article className="panel pre-approval-nested-panel">
           <p className="metric-label">System recommendation</p>
           <RecommendationBadge recommendation={evaluation.recommendation} />
-          <p className="metric-helper">
-            Advisory only. The evaluator surfaces deterministic policy support for the reviewer.
-          </p>
         </article>
 
         <article className="panel pre-approval-nested-panel">
-          <p className="metric-label">Reviewer decision</p>
+          <p className="metric-label">Selected decision</p>
           {finalDecision ? (
             <>
               <RecommendationBadge recommendation={finalDecision.decision} />
-              <p className="metric-helper">Final decision recorded for this request in the current session.</p>
+              <p className="metric-helper">Recorded in the current session.</p>
             </>
           ) : (
             <>
               <RecommendationBadge recommendation={pendingDecision} />
-              <p className="metric-helper">Select the final outcome you want to record for this request.</p>
+              <p className="metric-helper">Choose the final outcome.</p>
             </>
           )}
         </article>
@@ -119,16 +111,11 @@ export function ReviewerDecisionPanel({
 
       {differsFromRecommendation ? (
         <p className="decision-warning">
-          {actorLabel} decision differs from the system recommendation. That is allowed, but the final
-          outcome should reflect human judgment.
+          This decision differs from the system recommendation.
         </p>
       ) : null}
 
       <div className="pre-approval-form-actions">
-        <p className="muted-line">
-          The system recommendation stays visible for context. The {actorLabel.toLowerCase()} action is the final
-          recorded decision.
-        </p>
         <div className="decision-action-row">
           <button
             type="button"
@@ -151,7 +138,7 @@ export function ReviewerDecisionPanel({
 
       {finalDecision ? (
         <div className="decision-recorded-block">
-          <p className="metric-label">Final decision recorded</p>
+          <p className="metric-label">Recorded</p>
           <ul className="quality-list">
             <li>Decision: {formatRecommendationLabel(finalDecision.decision)}</li>
             <li>Recorded at: {formatDecisionTimestamp(finalDecision.decidedAt)}</li>

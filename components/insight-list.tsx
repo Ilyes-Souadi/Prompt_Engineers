@@ -9,8 +9,8 @@ export function InsightList({ insights }: InsightListProps) {
     <section className="panel">
       <div className="panel-header">
         <div>
-          <p className="section-kicker">Flagged insights</p>
-          <h2>Deterministic review findings</h2>
+          <p className="section-kicker">Priority queue</p>
+          <h2>Findings</h2>
         </div>
         <span className="muted-line">{insights.length} findings</span>
       </div>

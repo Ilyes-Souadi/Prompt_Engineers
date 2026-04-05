@@ -17,16 +17,16 @@ type PanelMessage = {
 };
 
 const starterQuestions = [
-  "What are the biggest risk alerts in this workbook?",
-  "Which merchants drive the most spend right now?",
+  "What should a manager review first in this workbook?",
+  "Which merchants drive the most spend?",
   "Why are so many items marked as workflow?",
 ];
 
 export function AssistantPanel({
-  datasetName,
-  transactionCount,
-  riskAlertCount,
-  workflowItemCount,
+  datasetName: _datasetName,
+  transactionCount: _transactionCount,
+  riskAlertCount: _riskAlertCount,
+  workflowItemCount: _workflowItemCount,
 }: AssistantPanelProps) {
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<PanelMessage[]>([]);
@@ -82,39 +82,6 @@ export function AssistantPanel({
 
   return (
     <aside className="assistant-panel">
-      <div className="assistant-header">
-        <div>
-          <p className="eyebrow">AI Assistant</p>
-          <h2>Finance copilot</h2>
-        </div>
-      </div>
-
-      <div className="assistant-state assistant-ready-state">
-        <span className="assistant-lock">Claude grounded chat</span>
-        <strong className="assistant-status">
-          {formatCount(transactionCount)} transactions are ready for questions.
-        </strong>
-        <p className="assistant-message">
-          Answers stay grounded in the workbook, the repo-backed policy document, and
-          deterministic outputs derived from them.
-        </p>
-      </div>
-
-      <div className="assistant-stats">
-        <div className="assistant-stat">
-          <span className="assistant-stat-label">Dataset</span>
-          <strong>{datasetName}</strong>
-        </div>
-        <div className="assistant-stat">
-          <span className="assistant-stat-label">Risk alerts</span>
-          <strong>{formatCount(riskAlertCount)}</strong>
-        </div>
-        <div className="assistant-stat">
-          <span className="assistant-stat-label">Workflow items</span>
-          <strong>{formatCount(workflowItemCount)}</strong>
-        </div>
-      </div>
-
       <div className="assistant-question-list">
         {starterQuestions.map((question) => (
           <button
@@ -158,9 +125,8 @@ export function AssistantPanel({
         }}
       >
         <label className="assistant-input">
-          <span>Ask a grounded question</span>
           <textarea
-            rows={4}
+            rows={3}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Summarize the biggest policy-risk patterns in this workbook."
@@ -168,11 +134,6 @@ export function AssistantPanel({
         </label>
 
         <div className="assistant-form-footer">
-          <p className="assistant-note">
-            Claude answers only from repo-backed source documents and deterministic outputs derived
-            from them. If `ANTHROPIC_API_KEY` or the Brim policy source document is missing, the
-            route returns a setup error instead of a fake answer.
-          </p>
           <button
             type="submit"
             className="assistant-submit"
@@ -194,10 +155,6 @@ function createPanelMessage(role: PanelMessage["role"], content: string): PanelM
     role,
     content,
   };
-}
-
-function formatCount(value: number) {
-  return new Intl.NumberFormat("en-CA").format(value);
 }
 
 function normalizeAssistantReply(value: string) {
